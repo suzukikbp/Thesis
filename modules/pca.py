@@ -18,24 +18,26 @@ from sklearn.decomposition import PCA
 from sklearn.cross_validation import cross_val_score
 
 
-def pca(dat,target_names,pix):
+def pca(dat_tr,dat_te,target_names,pix):
     tt = time.time()
+    dat = np.vstack([dat_tr,dat_te])
     print "  PCA"
-
     print "  org_image %s"%str(dat.shape)
-    pca = PCA(n_components=pix^2)
-    pca.fit(dat)
-    dat_pca= pca.transform(dat)
+    numCom =pix**2
     pca_scores = []
-    for n in range(0,pca.n_components):
-        pca.n_components = n
-        pca_scores.append(np.mean(cross_val_score(pca, dat)))
+    for n in range(0,numCom):
+        print n
+        pca = PCA(n_components=n)
+        pca.fit(dat)
+        dat_pca= pca.transform(dat)
+        if (sum(pca.explained_variance_ratio_)>0.8):
+            pca_scores.append(np.mean(cross_val_score(pca, dat)))
+            break
 
     print "  pca_image %s"%str(dat_pca.shape)
     print "  PCA: %.1f sec" %((time.time()-tt))
 
-    #print(pca.explained_variance_ratio_)
-    return dat_pca,pca_scores
+    return dat_pca[0:dat_tr.shape[0],],dat_pca[dat_tr.shape[0]:,],pca_scores
 
     """
     coeff=images_pca[:, 0]

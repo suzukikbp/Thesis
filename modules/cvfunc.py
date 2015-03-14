@@ -37,8 +37,7 @@ def makeSober(imgs,pixel):
         #cv2.waitKey(0)
 
 
-    #return np.array(directs)
-    return np.array(imgs_)
+    return np.array(imgs_).reshape(len(imgs_),pixel^2)
 
 
 
@@ -55,26 +54,25 @@ def makeContor(thresh,pixel):
         cont, hierarchy = cv2.findContours(img,cv2.RETR_TREE,cv2.CHAIN_APPROX_NONE)
         conts.append(cont)
         hierarchys.append(hierarchy)
-        #directs.append(contor2direct(cont,pixel))
+        # extract directions from contours
         direct =contor2direct(cont,pixel)
+        # sampling from directctions
         gaussians.append(direct2gaussian(direct,pixel,5))
-        """
+
         # drawing
-        tempimg = thresh[0].reshape(pixel,pixel)*180
+        """
+        tempimg = thresh[i].reshape(pixel,pixel)*180
         cv2.drawContours(tempimg, cont[0], -1, (128,255,128), -1 )
         cv2.namedWindow("Show Image",cv2.cv.CV_WINDOW_NORMAL)
         cv2.imshow("Show Image",tempimg)
         cv2.waitKey(0)
         """
-
-    #return thresh,np.array(conts), np.array(hierarchys), np.array(directs)
-    #return thresh,np.asarray(conts), np.asarray(hierarchys), np.asarray(directs)
-    # reshape
+    # reshape for feature matrix
     gaussians = np.array(gaussians)
     gaussians = gaussians.reshape(gaussians.shape[0],gaussians.shape[1]*gaussians.shape[2]*gaussians.shape[3])
 
     #return np.array(directs)
-    return np.array(gaussians)
+    return np.array(gaussians),conts
 
 
 # make Directions from contour images
@@ -138,7 +136,6 @@ def direct2gaussian(directs,pixel,filter_length):
         gaus = cv2.GaussianBlur(img,(filter_length,filter_length),0)
         # sampling the filtered image
         rimg = cv2.resize(gaus, (filter_length,filter_length),interpolation =cv2.cv.CV_INTER_CUBIC)
-        #rimg = cv2.resize(directs[i][j], (filter_length,filter_length),interpolation =cv2.cv.CV_INTER_NN)
         gaussian.append(rimg)
 
     return gaussian

@@ -50,7 +50,7 @@ Module ``datasets.mnist_basic`` gives access to the MNIST basic dataset.
 
 
 import numpy as np
-import os,time,sys
+import os,time,sys,cv2
 from sklearn import svm, datasets
 import mlpython.misc.io as mlio
 import pylab
@@ -164,15 +164,21 @@ def makeVarid(dir_path,kind):
 def selectNum(images,labels,nums):
     imglist =[]
     lbllist =[]
+    lbllist_binary =[]
     for i in range(0,len(labels)-1):
-        if(labels[i] in nums):
-        #if(labels[i]==8 or labels[i]==9):
+        if(labels[i] in nums[0]):
             lbllist.append(labels[i])
             imglist.append(images[i])
-    images = np.array(imglist)
-    labels = np.array(lbllist)
+            lbllist_binary.append(0)
+        elif(labels[i] in nums[1]):
+            lbllist.append(labels[i])
+            imglist.append(images[i])
+            lbllist_binary.append(1)
+    imglist = np.array(imglist)
+    lbllist = np.array(lbllist)
+    labels_binary = np.array(lbllist_binary)
 
-    return images,labels
+    return imglist,lbllist,labels_binary
 
 
 def drawimg(images,labels,dir_path,kind,pixel):
@@ -197,4 +203,31 @@ def drawimg(images,labels,dir_path,kind,pixel):
     pylab.savefig(os.path.join(dir_path,"images_"+kind+".png"), dpi=100)
     #print "Showing now"
     #pylab.show()
+
+
+def drawimgContour(images,labels,contours,dir_path,kind,pixel):
+
+    # draw the first 10 samples
+    # digits.images[i] : image
+    # digits.target[i] : the lael of image
+    ncol = 20
+    nrow = 3
+
+    for index, (image, label,cont) in enumerate(zip(images, labels,contours)[:nrow*ncol]):
+        image = image.reshape(pixel,pixel)/100.0
+        if kind.find('mnist_basic') == -1:image = image.T
+        pylab.subplot(nrow, ncol, index + 1)
+        pylab.axis('off')
+        cv2.drawContours(image, cont[0], -1, (128,255,128), -1 )
+        if(len(cont)>1):
+            cv2.drawContours(image, cont[1], -1, (128,128,128), -1 )
+        pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
+        pylab.title('%i' % label)
+
+
+
+
+
+    pylab.savefig(os.path.join(dir_path,"images_"+kind+".png"), dpi=100)
+
 
