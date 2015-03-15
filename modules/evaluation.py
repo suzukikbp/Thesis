@@ -19,7 +19,7 @@ def roc(labels, prob, kind):
     from sklearn.metrics import roc_curve, auc
     fpr, tpr, thresholds = roc_curve(labels, prob)
     roc_auc = auc(fpr, tpr)
-    print "  Area under the ROC curve of %s : %0.4f" % (kind,roc_auc)
+    print "  Area under the ROC curve of %s : %f" % (kind,roc_auc)
 
     """
     # Plot ROC curve
@@ -37,11 +37,11 @@ def roc(labels, prob, kind):
     pl.show()
     """
 
-def pre_recall(labels, prob):
+def pre_recall(labels, prob, kind):
     from sklearn.metrics import precision_recall_curve
     from sklearn.metrics import auc
     #precision, recall, thresholds = precision_recall_curve(labels_tebi, map(round,prob))
     precision, recall, thresholds = precision_recall_curve(labels, prob)
     area = auc(recall, precision)
-    print "  Area Under the Precision-Recall Curve of %s : %0.4f" % (kind,area)
+    print "  Area Under the Precision-Recall Curve of %s : %f" % (kind,area)
 

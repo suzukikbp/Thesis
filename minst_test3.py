@@ -31,22 +31,28 @@ featureExtrs = ['PCA','Bluring']
 
 def main(targetNumber):
 
-    # pixel size(only for a square)
-    pixel = 28
-    #targetNumber = 8
+    #################################
+    # set Parameters
+    pixel = 28 # pixel size (only for a square)
     dir_input = r"C:\Users\KSUZUKI\Dropbox\02_Research\03_MNIST\icml2007\data"
     dir_output = r"C:\Users\KSUZUKI\Dropbox\02_Research\03_MNIST\graphs"
     dataSet =dataSets[0]
     featureExtr = featureExtrs[1]
+    smallTest = 0 # 0: full dataset, 1: small fraction of dataset
+
+
+
+    #################################
     # 1. downloade data
     #obtain(dir_input,dataSet)
 
+    #################################
     # 2. make Varidation data
     #makeVarid(dir_input,dataSet)
 
+    #################################
     # 3-1. set data in memory
     datas = load(dir_input,True,dataSet,pixel)
-    #datas["train"][0].mem_data[0][9999][739]
 
     # training data
     images_tr = datas["train"][0].mem_data[0]
@@ -56,15 +62,19 @@ def main(targetNumber):
     labels_te = datas["test"][0].mem_data[1]
 
     # 3-2. extract the specific number based on "target_names"
-    #target_names =([targetNumber],np.delete(np.linspace(0,9,10,np.int16),targetNumber))
-    target_names =([targetNumber],[8])
+    target_names =([targetNumber],np.delete(np.linspace(0,9,10,np.int16),targetNumber))
+    if(smallTest == 1):target_names =([targetNumber],[8])
+    drawimg(images_tr,labels_tr,dir_output,(dataSet+str(target_names[0])+"__test"),pixel)
     images_tr,labels_tr,labels_trbi= selectNum(images_tr,labels_tr,target_names)
     images_te,labels_te,labels_tebi= selectNum(images_te,labels_te,target_names)
+    print "#trainImage : %d (#target : %d, #rest : %d )"%(len(labels_tr),len(labels_trbi[labels_trbi==0]),len(labels_trbi[labels_trbi==1]))
+    print "#testImage : %d"%len(labels_te)
 
 
     #drawimg(images_tr,labels_tr,dir_output,dataSet,pixel)
     drawimg(images_tr,labels_trbi,dir_output,(dataSet+str(target_names[0])),pixel)
 
+    #################################
     # 4-1. extract characteristics-- PCA
     if(featureExtr=='PCA'):
         xdat,xtest,score = pca(images_tr,images_te,target_names,pixel)
@@ -85,14 +95,15 @@ def main(targetNumber):
         # convolution and sampling the directional sub-images
 
         # test data
-        _,thresh_te = makeBinary(images_te.copy()[0:25000])
+        ##_,thresh_te = makeBinary(images_te.copy()[0:25000])
+        _,thresh_te = makeBinary(images_te.copy())
         xtest,_= makeContor(thresh_te,pixel)
         # drawing
         drawimgContour(images_tr,labels_tr,contours,dir_output,(dataSet+'_bluring'),pixel)
         print "  Contour/Blur: %0.2f sec" %((time.time()-tt))
 
 
-
+    #################################
     # 5. score function: twice iterated 10-fold cross-validated accuracy
     tt = time.time()
     print "  Tuning"
@@ -105,6 +116,7 @@ def main(targetNumber):
         return optunity.metrics.accuracy(y_test, y_pred)
 
 
+    #################################
     # 6. perform tuning
     #args = {'num_evals':100, 'C':[0, 10], 'gamma':[0, 1],'pmap':'optunity.pmap'}
     args = {'num_evals':100, 'C':[0, 10], 'gamma':[0, 1]}
@@ -116,6 +128,8 @@ def main(targetNumber):
     print "  Tuning: %0.2f sec" % optimal_pars2.stats["time"]
 
 
+    #################################
+    # 7 train model with tuned/default hyperparameters
     for i in range(0,4):
 
         predictImages = images_te
@@ -124,15 +138,15 @@ def main(targetNumber):
         kind = dataSet+"_predict_test_optunity"
         labels =labels_tebi
 
-        if(i == 2):
+        if(i == 1):
             kind = dataSet+"_predict_train_optunity"
             predictData =xdat
             predictImages = images_tr
             labels =labels_trbi
-        elif(i == 3):
+        elif(i == 2):
             kind = dataSet+"_predict_test_default"
             model =svm.SVC(kernel='rbf',probability=True)
-        elif(i == 4):
+        elif(i == 3):
             kind = dataSet+"_predict_train_default"
             model =svm.SVC(kernel='rbf',probability=True)
             predictData =xdat
@@ -144,10 +158,10 @@ def main(targetNumber):
         # fit to the test data
         predict = optimal_model.predict(predictData)
         predict_prob = optimal_model.predict_proba(predictData)
-        drawimg(predictImages,predict_optunity,dir_output,kind,pixel)
+        drawimg(predictImages,predict,dir_output,kind,pixel)
 
 
-
+        #################################
         # 8. evaluation--
         # Confusion Matrix
         from sklearn.metrics import confusion_matrix
@@ -165,7 +179,7 @@ def main(targetNumber):
         pre_recall(labels, predict_prob[:, 1],kind)
 
         # ROC curve
-        roc(labels, predict_optunity_prob[:, 1],kind)
+        roc(labels, predict_prob[:, 1],kind)
 
 
 

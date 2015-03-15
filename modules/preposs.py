@@ -103,23 +103,45 @@ def load(dir_path,load_to_memory,kind,pixel):
         tokens = line.split()
         return (np.array([float(i) for i in tokens[:-1]]), int(float(tokens[-1])))
 
-    train_file,valid_file,test_file = [os.path.join(dir_path, kind + ds + '.amat') for ds in ['_train','_valid','_test']]
-
+    train_file,valid_file,test_file = [os.path.join(dir_path, 'mnist_basic_' + ds + '.amat') for ds in ['train','valid','test']]
     # Get data
     train,valid,test = [mlio.load_from_file(f,load_line) for f in [train_file,valid_file,test_file]]
 
-    # Load data to memory
     lengths = [10000, 2000, 50000]
-    l2 = [1000, 200, 500]
     if load_to_memory:
         train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
-        #train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l,m) for d,l,m in zip([train,valid,test],lengths,l2)]
 
     # Get metadata
-    train_meta,valid_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
+    #train_meta,valid_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
+    train_meta,valid_meta,test_meta = [{'input_size':input_size,'targets':targets} for l in lengths]
+
+    return {'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)}
+
+    """
+    ##train_file,valid_file,test_file = [os.path.join(dir_path, kind + ds + '.amat') for ds in ['_train','_valid','_test']]
+    train_file,test_file = [os.path.join(dir_path, kind + ds + '.amat') for ds in ['_train','_test']]
+
+    # Get data
+    ##train,valid,test = [mlio.load_from_file(f,load_line) for f in [train_file,valid_file,test_file]]
+    train,test = [mlio.load_from_file(f,load_line) for f in [train_file,test_file]]
+
+    # Load data to memory
+    #lengths = [10000, 2000, 50000]
+    #l2 = [1000, 200, 500]
+    lengths = [10000,  50000]
+    l2 = [1000, 500]
+    if load_to_memory:
+        ##train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
+        train,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,test],lengths)]
+
+    # Get metadata
+    ##train_meta,valid_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
+    train_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
 
     print "  Loading : %.1f sec" %((time.time()-tt))
-    return {'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)}
+    #return {'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)}
+    return {'train':(train,train_meta),'test':(test,test_meta)}
+    """
 
 
 
@@ -188,17 +210,22 @@ def drawimg(images,labels,dir_path,kind,pixel):
     # digits.target[i] : the lael of image
     #ncol = 10
     #nrow = 2
-    ncol = 20
-    nrow = 3
+    ncol = 40
+    nrow = 5
+    count = 0
 
-    for index, (image, label) in enumerate(zip(images, labels)[:nrow*ncol]):
+    for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
+        if(index%10!=0):continue
+        #if(count==160):
+        #    testttt = 0
+        #print str(index)+","+str(count)
         image = image.reshape(pixel,pixel)
-        #image = image.reshape((pixel,pixel))
         if kind.find('mnist_basic') == -1:image = image.T
-        pylab.subplot(nrow, ncol, index + 1)
+        pylab.subplot(nrow, ncol, count + 1)
         pylab.axis('off')
         pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
         pylab.title('%i' % label)
+        count =count+1
 
     pylab.savefig(os.path.join(dir_path,"images_"+kind+".png"), dpi=100)
     #print "Showing now"
