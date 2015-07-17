@@ -64,7 +64,6 @@ def obtain(dir_path,kind):
 
     ## Download the main zip file
     dir_path = os.path.expanduser(dir_path)
-    #urllib.urlretrieve('http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip',os.path.join(dir_path,'mnist_basic.zip'))
     if(kind=='mnist_basic'):
         urllib.urlretrieve('http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip',os.path.join(dir_path,kind+'.zip'))
     else:
@@ -82,15 +81,64 @@ def obtain(dir_path,kind):
         outfile.close()
     fh.close()
     """
-    print "  Finish downloading : %.1f sec" %((time.time()-tt))
-    print "  You need to unzip downloaded data by hand"
+    print "Finish downloading : %.1f sec" %((time.time()-tt))
+    print "You need to unzip downloaded data by hand"
     sys.exit()
 
-#Loads the MNIST basic dataset
-def load(dir_path,load_to_memory,kind,pixel):
+# Add the lines of the file into a list
+def getLines(fp,name,show=True):
+    lineList = []
+    for line in fp:
+        lineList.append(line)
+    fp.close()
+    if show:print "Total line " + name+" "+str(len(lineList))
+    return lineList
 
+def checkLines(dir_path,kind):
+    train_file_path = os.path.join(dir_path,kind+'_train.amat')
+    valid_file_path = os.path.join(dir_path,kind+'_valid.amat')
+    test_file_path = os.path.join(dir_path,kind+'_test.amat')
+
+    getLines(open(train_file_path),'train')
+    getLines(open(valid_file_path),'valid')
+    getLines(open(test_file_path),'test')
+
+# Split data in valid file and train file
+def makeVarid(dir_path,kind):
+
+    train_file_path = os.path.join(dir_path,kind+'_train.amat')
+    valid_file_path = os.path.join(dir_path,kind+'_valid.amat')
+    test_file_path = os.path.join(dir_path,kind+'_test.amat')
+
+    lineList=getLines(open(train_file_path),'train',show=False)
+
+    # Create valid file and train file
+    valid_file = open(valid_file_path, "w")
+    train_file = open(train_file_path, "w")
+
+    # Write lines into valid file and train file
+    c=0
+    for i, line in enumerate(lineList):#line = 28*28
+        if ((i + 1) > 10000):
+            valid_file.write(line)
+        else:
+            c=c+1
+            train_file.write(line)
+
+    print "Total line " +"train"+" "+str(c)
+    print "Total line " +"valid"+" "+str(len(lineList)-c)
+    getLines(open(test_file_path),'test',show=True)
+
+    valid_file.close()
+    train_file.close()
+
+    ## Delete Temp file
+    #os.remove(os.path.join(dir_path,'mnist_basic.zip'))
+
+#Loads the MNIST basic dataset
+def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
+    print "Loading"
     tt = time.time()
-    print "  Loading"
 
     input_size = pixel**2
     dir_path = os.path.expanduser(dir_path)
@@ -103,91 +151,38 @@ def load(dir_path,load_to_memory,kind,pixel):
         tokens = line.split()
         return (np.array([float(i) for i in tokens[:-1]]), int(float(tokens[-1])))
 
+    def setToVariable(datas):
+        # training data
+        images_tr = (datas["train"][0].mem_data[0]).astype(np.float32)
+        labels_tr = (datas["train"][0].mem_data[1]).astype(np.float32)
+        # test data
+        images_te = (datas["test"][0].mem_data[0]).astype(np.float32)
+        labels_te = (datas["test"][0].mem_data[1]).astype(np.float32)
+        # validation data
+        images_val = (datas["valid"][0].mem_data[0]).astype(np.float32)
+        labels_val = (datas["valid"][0].mem_data[1]).astype(np.float32)
+
+
+        return [images_tr,labels_tr,images_val,labels_val,images_te,labels_te]
+
+
     train_file,valid_file,test_file = [os.path.join(dir_path, 'mnist_basic_' + ds + '.amat') for ds in ['train','valid','test']]
     # Get data
     train,valid,test = [mlio.load_from_file(f,load_line) for f in [train_file,valid_file,test_file]]
-
-    lengths = [10000, 2000, 50000]
-    if load_to_memory:
-        train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
+    lengths = [min(trlen,10000), min(vlen,2000), min(50000,telen)]
+    train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
 
     # Get metadata
-    #train_meta,valid_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
     train_meta,valid_meta,test_meta = [{'input_size':input_size,'targets':targets} for l in lengths]
 
-    return {'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)}
-
-    """
-    ##train_file,valid_file,test_file = [os.path.join(dir_path, kind + ds + '.amat') for ds in ['_train','_valid','_test']]
-    train_file,test_file = [os.path.join(dir_path, kind + ds + '.amat') for ds in ['_train','_test']]
-
-    # Get data
-    ##train,valid,test = [mlio.load_from_file(f,load_line) for f in [train_file,valid_file,test_file]]
-    train,test = [mlio.load_from_file(f,load_line) for f in [train_file,test_file]]
-
-    # Load data to memory
-    #lengths = [10000, 2000, 50000]
-    #l2 = [1000, 200, 500]
-    lengths = [10000,  50000]
-    l2 = [1000, 500]
-    if load_to_memory:
-        ##train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
-        train,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,test],lengths)]
-
-    # Get metadata
-    ##train_meta,valid_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
-    train_meta,test_meta = [{'input_size':input_size, 'length':l, 'targets':targets} for l in lengths]
-
-    print "  Loading : %.1f sec" %((time.time()-tt))
-    #return {'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)}
-    return {'train':(train,train_meta),'test':(test,test_meta)}
-    """
-
-
-
-def makeVarid(dir_path,kind):
-
-    train_file_path = os.path.join(dir_path,kind+'_train.amat')
-    valid_file_path = os.path.join(dir_path,kind+'_valid.amat')
-    test_file_path = os.path.join(dir_path,kind+'_test.amat')
-
-    # Rename train and test files
-    #os.rename(os.path.join(dir_path,'mnist_train.amat'), train_file_path)
-    #os.rename(os.path.join(dir_path,'mnist_test.amat'), test_file_path)
-
-    # Split data in valid file and train file
-    fp = open(train_file_path)
-
-    # Add the lines of the file into a list
-    lineList = []
-    for line in fp:
-        lineList.append(line)
-    fp.close()
-
-    # Create valid file and train file
-    valid_file = open(valid_file_path, "w")
-    train_file = open(train_file_path, "w")
-
-    # Write lines into valid file and train file
-    for i, line in enumerate(lineList):
-        if ((i + 1) > 10000):
-            valid_file.write(line)
-        else:
-            train_file.write(line)
-
-    valid_file.close()
-    train_file.close()
-
-    ## Delete Temp file
-    #os.remove(os.path.join(dir_path,'mnist_basic.zip'))
-
-    print 'Done'
+    print "Loading", int(time.time()-tt),"sec"
+    return setToVariable({'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)})
 
 def selectNum(images,labels,nums):
-    imglist =[]
-    lbllist =[]
-    lbllist_binary =[]
-    for i in range(0,len(labels)-1):
+    imglist=[]
+    lbllist=[]
+    lbllist_binary=[]
+    for i in range(0,len(labels)):
         if(labels[i] in nums[0]):
             lbllist.append(labels[i])
             imglist.append(images[i])
@@ -196,47 +191,30 @@ def selectNum(images,labels,nums):
             lbllist.append(labels[i])
             imglist.append(images[i])
             lbllist_binary.append(1)
-    imglist = np.array(imglist)
-    lbllist = np.array(lbllist)
-    labels_binary = np.array(lbllist_binary)
+    return np.array(imglist),np.array(lbllist),np.array(lbllist_binary)
 
-    return imglist,lbllist,labels_binary
-
-
-def drawimg(images,labels,dir_path,kind,pixel):
-
-    # draw the first 10 samples
-    # digits.images[i] : image
-    # digits.target[i] : the lael of image
-    #ncol = 10
-    #nrow = 2
-    ncol = 40
-    nrow = 5
+def drawimg(images,labels,dir_path,kind,pixel,basic=False,ncol=40,nrow=5):
+    #print "  Drawing"
+    tt = time.time()
+    if(len(pylab.get_fignums())>0):pylab.close()
     count = 0
 
     for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
-        if(index%10!=0):continue
-        #if(count==160):
-        #    testttt = 0
-        #print str(index)+","+str(count)
+        if(index%4!=0):continue
         image = image.reshape(pixel,pixel)
-        if kind.find('mnist_basic') == -1:image = image.T
+        #if kind.find('basic') == -1:image = image.T
+        if basic == True:image = image.T
         pylab.subplot(nrow, ncol, count + 1)
         pylab.axis('off')
         pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
         pylab.title('%i' % label)
         count =count+1
 
-    pylab.savefig(os.path.join(dir_path,"images_"+kind+".png"), dpi=100)
-    #print "Showing now"
-    #pylab.show()
-
+    pylab.savefig(os.path.join(dir_path,kind+".png"), dpi=100)
+    pylab.close()
+    #print "  Drawing", int(time.time()-tt),"sec"
 
 def drawimgContour(images,labels,contours,dir_path,kind,pixel):
-
-    # draw the first 10 samples
-    # digits.images[i] : image
-    # digits.target[i] : the lael of image
     ncol = 20
     nrow = 3
 
@@ -251,10 +229,13 @@ def drawimgContour(images,labels,contours,dir_path,kind,pixel):
         pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
         pylab.title('%i' % label)
 
-
-
-
-
     pylab.savefig(os.path.join(dir_path,"images_"+kind+".png"), dpi=100)
+
+
+
+
+
+
+
 
 

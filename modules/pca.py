@@ -1,59 +1,79 @@
 # encoding: utf-8
 
-#-------------------------------------------------------------------------------
-# Name:        pca
-# Purpose:
-#
-# Author:      KSUZUKI
-#
-# Created:     04/02/2015
-# Copyright:   (c) KSUZUKI 2015
-# Licence:     <your licence>
-#-------------------------------------------------------------------------------
-
-import os,cv2,time
+import os
 import numpy as np
+import copy
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
-from sklearn.cross_validation import cross_val_score
 
+DEBUG=1
 
-def pca(dat_tr,dat_te,target_names,pix):
-    tt = time.time()
-    dat = np.vstack([dat_tr,dat_te])
-    print "  PCA"
-    print "  org_image %s"%str(dat.shape)
-    numCom =pix**2
-    pca_scores = []
-    for n in range(0,numCom):
-        print n
-        pca = PCA(n_components=n)
-        pca.fit(dat)
-        dat_pca= pca.transform(dat)
-        if (sum(pca.explained_variance_ratio_)>0.8):
-            pca_scores.append(np.mean(cross_val_score(pca, dat)))
-            break
+def pca_project(W, X, mu=None):
+    if mu is None:
+        return np.dot(X,W)
+    return np.dot(X - mu, W)
 
-    print "  pca_image %s"%str(dat_pca.shape)
-    print "  PCA: %.1f sec" %((time.time()-tt))
+def pca_reconstruct(W, Y, mu=None):
+    if mu is None:
+        return np.dot(Y,W.T)
+    return np.dot(Y, W.T) + mu
 
-    return dat_pca[0:dat_tr.shape[0],],dat_pca[dat_tr.shape[0]:,],pca_scores
+def show_scores(data,lab,dir_output,name='',cp=5):
+    col=["b",'orange',"g","r","c","m","y","k","w","#77ff77"]
+    for i in range(1,cp):
+        plt.clf()
+        for j in range(0,len(set(lab))):
+            idx=np.where(lab==j)
+            plt.scatter(data[idx,0],data[idx,i],marker='o',label=str(j),c=col[j])
+        plt.xlabel("Principal component 1")
+        plt.ylabel("Principal component "+str(i+1))
+        plt.legend()
+        #plt.savefig(os.path.join(dir_output,'PC'+str(i+1)+'_'+dataname+'_'+str(len(set(lab)))+'.png'))
+        plt.savefig(os.path.join(dir_output,name+'PC'+str(i+1)+'_'+str(len(set(lab)))+'.png'))
 
-    """
-    coeff=images_pca[:, 0]
-    Ar = dot(coeff,score).T+mean(images)
-    imshow(flipud(Ar))
-    gray()
-    """
+def show_eigenvalues(eigenvalues,dir_output,name='',cp_show=100,ratio=0.90):
+    cp=len(eigenvalues)
+    culm=[]
+    val=0
+    val_all=sum(eigenvalues)
 
-def plotpca(target_names,images_pca,labels,kind,dir_path):
-    colors = [plt.cm.spectral(i/10., 1) for i in range(10)]
-    plt.figure()
-    for c, target_name  in zip(colors, target_names):
-        plt.scatter(images_pca[labels== target_name, 0], images_pca[labels== target_name, 1], c=c, label = str(target_name))
-    plt.legend(loc=3)
-    plt.xlabel('Factor 1')
-    plt.ylabel('Factor 2')
-    plt.title('PCA_'+kind)
-    plt.savefig(os.path.join(dir_path,"pcaplot_"+kind+".png"), dpi=100)
-    #plt.show()
+    for i in range(0,len(eigenvalues)-1):
+        val=eigenvalues[i]+val
+        culm.append(val*1.0/val_all)
+        if((val*1.0/val_all>ratio)and(i<cp)):cp=i
+    plt.clf()
+    plt.plot(culm[0:cp_show])
+    plt.xlabel("Index")
+    plt.ylabel("Cumulated Eigenvalues (%)")
+    plt.savefig(os.path.join(dir_output,name+'eigenvalues_'+str(cp_show)+'.png'))
+    return cp
+
+# select only num_components
+def select_eigenvalues(eigenvalues,eigenvectors,num_components=0):
+    eigenvalues = eigenvalues[0:num_components].copy()
+    eigenvectors = eigenvectors[:,0:num_components].copy()
+    return eigenvalues, eigenvectors
+
+def pca(X, num_components=0):
+    [n,d] = X.shape
+    if (num_components <= 0) or (num_components>n):
+        num_components = n
+    mu = X.mean(axis=0),
+    X = X - mu
+    if n>d:
+        C = np.dot(X.T,X)
+        [eigenvalues,eigenvectors] = np.linalg.eigh(C)
+    else:
+        C = np.dot(X,X.T)
+        [eigenvalues,eigenvectors] = np.linalg.eigh(C)
+        eigenvectors = np.dot(X.T,eigenvectors)
+        for i in xrange(n):
+            eigenvectors[:,i] = eigenvectors[:,i]/np.linalg.norm(eigenvectors[:,i])
+    # or simply perform an economy size decomposition
+    # eigenvectors, eigenvalues, variance = np.linalg.svd(X.T, full_matrices=False)
+    # sort eigenvectors descending by their eigenvalue
+    idx = np.argsort(-eigenvalues)
+    eigenvalues = eigenvalues[idx]
+    eigenvectors = eigenvectors[:,idx]
+
+    return [eigenvalues, eigenvectors, mu]
+
