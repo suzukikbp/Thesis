@@ -178,6 +178,7 @@ def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
     print "Loading", int(time.time()-tt),"sec"
     return setToVariable({'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)})
 
+"""
 def selectNum(images,labels,nums):
     imglist=[]
     lbllist=[]
@@ -192,24 +193,55 @@ def selectNum(images,labels,nums):
             imglist.append(images[i])
             lbllist_binary.append(1)
     return np.array(imglist),np.array(lbllist),np.array(lbllist_binary)
+"""
+def selectNum(labels,nums):
+    lbllist_binary=[]
+    for i in range(0,len(labels)):
+        if(labels[i] in nums[0]):
+            lbllist_binary.append(0)
+        elif(labels[i] in nums[1]):
+            lbllist_binary.append(1)
+    return np.array(lbllist_binary)
 
-def drawimg(images,labels,dir_path,kind,pixel,basic=False,ncol=40,nrow=5):
+
+def drawimg(images,labels,dir_path,kind,pixel,tnam='',basic=False,ncol=40,nrow=5,skip=True):
     #print "  Drawing"
     tt = time.time()
     if(len(pylab.get_fignums())>0):pylab.close()
     count = 0
 
+    """
+    fig, axs = plt.subplots(nrows=nrow, ncols=ncol, sharex=True, figsize=(50,50))
+    #ax.locator_params(nbins=4)
+
     for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
-        if(index%4!=0):continue
-        image = image.reshape(pixel,pixel)
+        if skip:
+            if(index%4!=0):continue
+        if len(image.shape)==1:
+            image = image.reshape(pixel,pixel)
+        #if kind.find('basic') == -1:image = image.T
+        if basic == True:image = image.T
+        ax = axs[count//ncol,count%ncol]
+        ax.axis('off')
+        ax.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
+        ax.set_title('%s' % str(label))
+        count =count+1
+
+    """
+    for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
+        if skip:
+            if(index%4!=0):continue
+        if len(image.shape)==1:
+            image = image.reshape(pixel,pixel)
         #if kind.find('basic') == -1:image = image.T
         if basic == True:image = image.T
         pylab.subplot(nrow, ncol, count + 1)
         pylab.axis('off')
         pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
-        pylab.title('%i' % label)
+        pylab.title('%s' % str(label))
         count =count+1
 
+    pylab.suptitle(tnam)
     pylab.savefig(os.path.join(dir_path,kind+".png"), dpi=100)
     pylab.close()
     #print "  Drawing", int(time.time()-tt),"sec"
