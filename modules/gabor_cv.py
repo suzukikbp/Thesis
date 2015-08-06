@@ -12,15 +12,6 @@ from modules.pca import *
 from modules.preposs import *
 from modules.gabor import *
 
-# width(w): width of stroke = kernel size
-# lamda: wavelength of simusdidal factor (scale)
-# ksize: kernel size
-# phis: orientation of the stroke
-# nbPhi: # of  phis
-# N: # of block in the images
-# D: # of sampling interval (# pixel)
-# sigma:
-
 
 class Gabor_cv(Gabor):
     #def __init__(self,pixel,img_tr,img_te,dir_in,dir_out,bname,\
@@ -29,7 +20,7 @@ class Gabor_cv(Gabor):
 
         self=g
         self.SHOW = 0
-        self.DEBUG = 1
+        self.DEBUG = 0
         self.EXP = True
 
         # Initialization

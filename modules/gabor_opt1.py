@@ -57,7 +57,7 @@ class Gabor_opt1(Gabor):
             lamda /=100.
             sigma /=10.
             nbPhi=int(nbPhi)
-            ksize,n,D=self.modifyParam(ksize,n)
+            ksize,n,D,nbPhi=self.modifyParam(ksize,n,nbPhi)
             phis = np.linspace(-np.pi/2,np.pi/4,nbPhi)
             # calculate ecc
             ecc,imgs = self.compareGabor(sigma=sigma,ksize=ksize,lamda=lamda,phis=phis,N=n,imgs=x_train)
@@ -83,15 +83,16 @@ class Gabor_opt1(Gabor):
         optpars, optpars2 = optunity.optimize(solver,set_sigma,maximize=False)
 
         # 3. Set optimal parameters
-        self.ksize,self.N,self.D=self.modifyParam(optpars['ksize'],optpars['n'])
-        self.lamda,self.sigma,self.nbPhi=optpars['lamda'],optpars['sigma'],int(optpars['nbPhi'])
+        self.ksize,self.N,self.D,self.nbPhi=self.modifyParam(optpars['ksize'],optpars['n'],optpars['nbPhi'])
+        self.lamda,self.sigma=optpars['lamda']/100.,optpars['sigma']/10.
         self.phis=np.linspace(-np.pi/2,np.pi/4,self.nbPhi)
+        self.eccs=min(np.array(optpars2.call_log['values']))
         # export
-        print '    === Optimap params ===\n    w:_, lm:%.2f, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,AECCS:%.3f'%(self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,min(np.array(optpars2.call_log['values'])))
+        print '    === Optimap params ===\n    w:_, lm:%.2f, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,AECCS:%.3f'%(self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.eccs)
         self.results.extend([solvers[0],str(numg),str(nump),str(nfol),str(nitr),str(optpars2.stats['time'])])
 
         # 4. Set optimal param for additional regulation
-        #self.setAlpha(numg=numg,nump=nump,nfol=nfol,nitr=nitr)
+        self.setAlpha(numg=numg,nump=nump,nfol=nfol,nitr=nitr)
 
 
 # Adaptive regulation of outputs of Gabor filters
@@ -101,13 +102,15 @@ class Gabor_opt1(Gabor):
         print '  Adaptive regulation'
         # 1. Set initial Parameters
         #alphas = np.linspace(0,5,10)
-        alphas = np.linspace(0,1,10)
-        if self.DEBUG ==1:alphas = np.linspace(0,10,10)
-        self.lamdas = np.linspace(0.5,self.lamda,self.lamda*2)
+        alphas = np.linspace(1,5,10)
+        if self.DEBUG ==1:alphas = np.linspace(1,5,10)
+        #self.lamdas = np.linspace(0.001,self.lamda,self.lamda*2)
+        self.lamdas = np.linspace(0.001,self.lamda,10)
 
         # 2. Optimize parameters
         @optunity.cross_validated(x=self.img_tr, num_folds=nfol, num_iter=nitr)
         def alpha_loss(x_train,x_test,alpha):
+            if alpha < 1:alpha=1
             rmses_lam,maxOuts_lam,_,_=self.lossFun_alpha(lamdas=self.lamdas,alpha=alpha,imgs=x_train)
             print '    alpha: %.3f, rmse_sum: %.3f'%(alpha,rmses_lam.sum())
             return rmses_lam.sum()

@@ -14,7 +14,7 @@ from modules.preposs import *
 
 
 class Gabor():
-    def __init__(self,pixel,img_tr,img_te,img_vl, dir_in, dir_out,bname,ws=[5],nbPhis=[4],ns=[7]):
+    def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,**kargs):
         self.SHOW = 0
         self.DEBUG = 0
         self.EXP = True
@@ -29,24 +29,42 @@ class Gabor():
         self.f = open(csvname, 'ab+')
         self.csvWriter = csv.writer(self.f)
 
-        # 2. Optimize parameters
+        if kargs['opt']:self.optParams(**kargs)
+        else:self.setParams(**kargs)
+
+    # set parameters
+    def setParams(self,**kargs):
+        self.ksize=kargs['ks']
+        self.sigma=kargs['sigma']
+        self.lamda=kargs['lmd']
+        self.N=kargs['n']
+        self.D=kargs['d']
+        self.nbPhi=kargs['nbPhi']
+        self.alpha=kargs['alpha']
+        self.width=-1
+        self.phis=np.linspace(-np.pi/2,np.pi/4,self.nbPhi)
+        print '    === Optimal patams ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
+
+    # optimize parameters
+    def optParams(self,**kargs):
         params1=[]
         params2=[]
         self.check=[]
-        for w in ws:
+        for w in kargs['ws']:
             self.linex=[]
             self.liney=[]
             self.labs=[]
-            for nbPhi in nbPhis:
-                for n in ns:
+            for nbPhi in kargs['nbPhis']:
+                for n in kargs['ns']:
                     tmp=self.setSigma(w,nbPhi,n)
                     params1.append(tmp[0:2])
                     params2.append(tmp[2:4])
             self.plotMultiLines(self.linex,self.liney,xlab='Sigma',ylab='Average ECC',tnam='Width %d'%w,multi=True,labels=self.labs)
 
-        # 3. Set optimal parameters
+        # Set optimal parameters
         params=np.array(params1).transpose()
-        idx = np.where(params[0]==min(params[0]))[0][0]
+        self.eccs=min(params[0])
+        idx = np.where(params[0]==self.eccs)[0][0]
         self.sigma=params[1][idx]
         ps=params2[idx]
         self.results.extend(ps[0])
@@ -58,15 +76,15 @@ class Gabor():
         self.ksize = ps[1][2]
         self.D = ps[1][3]
 
-        # 4. Set optimal param for additional regulation
+        # Additional regulation
         self.setAlpha()
 
 
-# N:the number of block in the images
-# w:width of stroke = kernel size
-#####################################################################
+    # N:the number of block in the images
+    # w:width of stroke = kernel size
+    #####################################################################
     def setSigma(self,w,nbPhi,N):
-#####################################################################
+    #####################################################################
         # 1. Set params(width,phis,lamda,ksize,S,N) under the constraints
         width = w # width of stroke = kernel size
         phis = np.linspace(-np.pi/2,np.pi/4,nbPhi) # orientation of the stroke
@@ -74,7 +92,7 @@ class Gabor():
         ksize = width     # kernel size (=M)
         D = self.pixel/N  # sampling interval (# pixel)
 
-        ksize,N,D=self.modifyParam(ksize,N,kdcons=True)
+        ksize,N,D,nbPhi=self.modifyParam(ksize,N,nbPhi)
         fn ='W%sL%sNP%sK%sD%s'%(str(w).zfill(2),str(lamda).zfill(2),str(nbPhi).zfill(2),str(ksize).zfill(2),str(D).zfill(2))
 
         # check if above params are already tried or not
@@ -102,13 +120,13 @@ class Gabor():
 
         # sigma which produces the lowest average eccs
         av_eccs = np.delete(av_eccs,np.where(av_eccs==0.))
-        idx = np.where(av_eccs==min(av_eccs))[0][0]
+        fin_eccs=min(av_eccs)
+        idx = np.where(av_eccs==fin_eccs)[0][0]
         self.showLineGraph(sigmas,np.array(av_eccs),'Sigma','Average ECC',tnam=fn)
         self.linex.append(sigmas)
         self.liney.append(np.array(av_eccs))
         self.labs.append('D: %d, nbPhi: %d'%(D,nbPhi))
         fin_sigma = sigmas[idx]
-        fin_eccs=min(av_eccs)
         params=['','','','','']
 
         params.append(str(round(time.time()-tt,3)))
@@ -121,15 +139,15 @@ class Gabor():
         return [fin_eccs,fin_sigma,params,[w,nbPhi,ksize,D,N]]
 
 
-# Adaptive regulation of outputs of Gabor filters
-#####################################################################
+    # Adaptive regulation of outputs of Gabor filters
+    #####################################################################
     def setAlpha(self):
-#####################################################################
+    #####################################################################
         print '    Adaptive regulation'
         tt=time.time()
-        alphas = np.linspace(0.5,5,10)
-        if self.DEBUG ==1:alphas = np.linspace(0.5,10,3)
-        self.lamdas = np.linspace(0.5,self.lamda,self.lamda*2)
+        alphas = np.linspace(1,5,10)#(0.5,5,10)
+        if self.DEBUG ==1:alphas = np.linspace(1,10,3)#(0.5,10,3)
+        self.lamdas = np.linspace(0.001,self.lamda,10)
         sums_rmse,gbs,gbas,gbrs=[],[],[],[]
         for alpha in alphas:
             rmses_lam,maxOuts_lam,gbr,gbr_ad=self.lossFun_alpha(lamdas=self.lamdas,alpha=alpha)
@@ -155,10 +173,9 @@ class Gabor():
         print '    Adaptive regulation:%.2f'%(time.time()-tt)
 
 
-
-#####################################################################
-    def gaborMain(self):
-#####################################################################
+    #####################################################################
+    def applyGabor(self):
+    #####################################################################
 
         # 1. Set Gabor kernel with optimal params
         self.kers = [] # kernels (each phi)
@@ -182,7 +199,7 @@ class Gabor():
 
         #################################
         # 4. Export results and return
-        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp)])
+        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
         self.csvWriter.writerow(self.results)
         self.f.close()
         del self.csvWriter,self.f
@@ -196,14 +213,22 @@ class Gabor():
 #####################################################################
 
     #  Apply constraints to params
-    def modifyParam(self,ksize,n,kdcons=True):
-        ksize,n=min(int(ksize),int(self.pixel-2)),int(n)
+    def modifyParam(self,ksize,n,nbPhi):
+
+        # modify the number of phi
+        if nbPhi<2:nbPhi=2
+
+        # modify kernel size
+        ksize=min(int(ksize),int(self.pixel-2))
+        # make ksize to odd number
+        if not ksize%2: ksize = ksize+1
+
         # modify N
+        n=int(n)
         if n==0:n=1
         elif n>self.pixel:n=self.pixel
-        # kernel size to odd number
-        if not ksize%2: ksize = ksize+1
-        # sampling interval (# pixel)
+
+        # modify D sampling interval (# pixel)
         D = self.pixel/n
         if ksize < D: # D < ksize
             D =ksize
@@ -211,8 +236,10 @@ class Gabor():
             while self.pixel%D!=0:D-=1
         except:
             print 'D value error D %d, ksize %d, N %d '%(D,ksize,n)
+
+        # modify N according to D
         n =self.pixel/D
-        return ksize,n,D
+        return ksize,n,D,nbPhi
 
     #  Estimate range of sigma
     def estSigRange(self,phis,lamda,width):
@@ -458,10 +485,10 @@ class Gabor():
                     F_neg += G*min(0,block[m,n])
         return [F_pos,F_neg]
 
-    # Apply gabor and regularization
+    # Set gabor and regularization
     #   @img: image
     #   @return   real part of output
-    def applyGabor(self,img,alpha=-1):
+    def setGabor(self,img,alpha=-1):
         if alpha==-1:alpha=self.alpha
         outputs = []
         for ker in self.kers:
@@ -480,7 +507,7 @@ class Gabor():
         cc=0
         for img in imgs:
             temp=[]
-            rimg = self.applyGabor(img,alpha=alpha)
+            rimg = self.setGabor(img,alpha=alpha)
             # extract features
             for x in range(brange,(self.pixel-brange)):
                 for y in range(brange,(self.pixel-brange)):

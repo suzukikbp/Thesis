@@ -154,13 +154,13 @@ def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
     def setToVariable(datas):
         # training data
         images_tr = (datas["train"][0].mem_data[0]).astype(np.float32)
-        labels_tr = (datas["train"][0].mem_data[1]).astype(np.float32)
+        labels_tr = (datas["train"][0].mem_data[1]).astype(np.int32)
         # test data
         images_te = (datas["test"][0].mem_data[0]).astype(np.float32)
-        labels_te = (datas["test"][0].mem_data[1]).astype(np.float32)
+        labels_te = (datas["test"][0].mem_data[1]).astype(np.int32)
         # validation data
         images_val = (datas["valid"][0].mem_data[0]).astype(np.float32)
-        labels_val = (datas["valid"][0].mem_data[1]).astype(np.float32)
+        labels_val = (datas["valid"][0].mem_data[1]).astype(np.int32)
 
 
         return [images_tr,labels_tr,images_val,labels_val,images_te,labels_te]
