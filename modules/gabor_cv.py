@@ -20,7 +20,7 @@ class Gabor_cv(Gabor):
 
         self=g
         self.SHOW = 0
-        self.DEBUG = 0
+        self.DEBUG = 1
         self.EXP = True
 
         # Initialization

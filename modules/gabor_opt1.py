@@ -32,7 +32,7 @@ class Gabor_opt1(Gabor):
                 optparms=[3,4,2,1]):
 
         self.SHOW = 0
-        self.DEBUG = 0
+        self.DEBUG = 1
         self.EXP = True
         self.width=-1
         if self.DEBUG==1:print 'DEBUG MODE'
@@ -94,6 +94,11 @@ class Gabor_opt1(Gabor):
         # 4. Set optimal param for additional regulation
         self.setAlpha(numg=numg,nump=nump,nfol=nfol,nitr=nitr)
 
+        #  Export results
+        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
+        self.csvWriter.writerow(self.results)
+        self.f.close()
+        del self.csvWriter,self.f
 
 # Adaptive regulation of outputs of Gabor filters
 #####################################################################

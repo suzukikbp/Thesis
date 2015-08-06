@@ -16,7 +16,7 @@ from modules.preposs import *
 class Gabor():
     def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,**kargs):
         self.SHOW = 0
-        self.DEBUG = 0
+        self.DEBUG = 1
         self.EXP = True
         if self.DEBUG==1:print 'DEBUG MODE'
 
@@ -41,12 +41,14 @@ class Gabor():
         self.D=kargs['d']
         self.nbPhi=kargs['nbPhi']
         self.alpha=kargs['alpha']
+        self.eccs=kargs['eccs']
         self.width=-1
         self.phis=np.linspace(-np.pi/2,np.pi/4,self.nbPhi)
-        print '    === Optimal patams ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
+        print '    === Set params ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
 
     # optimize parameters
     def optParams(self,**kargs):
+        tt=time.time()
         params1=[]
         params2=[]
         self.check=[]
@@ -67,7 +69,7 @@ class Gabor():
         idx = np.where(params[0]==self.eccs)[0][0]
         self.sigma=params[1][idx]
         ps=params2[idx]
-        self.results.extend(ps[0])
+        self.results.extend(time.time()-tt)
         self.width = ps[1][0]
         self.N = ps[1][4]
         self.nbPhi=ps[1][1]
@@ -78,6 +80,13 @@ class Gabor():
 
         # Additional regulation
         self.setAlpha()
+
+        #  Export results
+        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
+        self.csvWriter.writerow(self.results)
+        self.f.close()
+        del self.csvWriter,self.f
+
 
 
     # N:the number of block in the images
@@ -195,14 +204,9 @@ class Gabor():
         #################################
         # 3. Compress dimentionality : PCA
         xtrain,xtest,xval,cp = PCA().main([hist_tr,hist_te,hist_vl],self.dir_output,self.bname)
-        print '    PCA: %d'%cp
+        print '    PCA: %dcp'%cp
 
         #################################
-        # 4. Export results and return
-        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
-        self.csvWriter.writerow(self.results)
-        self.f.close()
-        del self.csvWriter,self.f
 
         params = '%s;%s;%s;%s;%s;%s;%s;%s;%s'%(str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp))
         return [xtrain, xtest,xval,params]
@@ -499,8 +503,8 @@ class Gabor():
 
     # Extract features
     #   @imgs: buncg of images
-    #   @brange: the range of block to calculate histogram
-    #   @return   list of features (histograms)
+    #   @brange: range of block to calculate histogram
+    #   @return: list of features (histograms)
     def extractFeatures(self,imgs,brange,alpha=-1):
         if alpha==-1:alpha=self.alpha
         hist = []
@@ -514,7 +518,7 @@ class Gabor():
                     temp.append(self.buildHist(rimg[x-brange:x+brange,y-brange:y+brange],tau=self.tau))
             hist.append(temp)
             cc +=1
-            if cc%25==0: print '     done: %d /%d '%(cc,len(imgs))
+            if cc%25==0 or cc==len(imgs): print '     done: %d /%d '%(cc,len(imgs))
         hist=np.array(hist)
         return hist.reshape(hist.shape[0],hist.shape[1]*hist.shape[2])
 
