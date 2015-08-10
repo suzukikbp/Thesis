@@ -16,6 +16,14 @@ import numpy as np
 import optunity,optunity.metrics
 import matplotlib.pyplot as plt
 from sklearn.grid_search import GridSearchCV
+# k nearest neighbours
+from sklearn.neighbors import KNeighborsClassifier
+# support vector machine classifier
+from sklearn.svm import SVC
+# Naive Bayes
+from sklearn.naive_bayes import GaussianNB
+# Random Forest
+from sklearn.ensemble import RandomForestClassifier
 
 from modules.preposs import *
 from modules.pca import *
@@ -26,32 +34,40 @@ from modules.gabor_cv import *
 from modules.gabor_opt1 import *
 
 
-opts = ['Default','CV','Gsearch','Optunity']
 
 
 class Classification():
-
-    def main(self,dgts,featureExtr,tt):
+    def main(self,dgts,featureExtr,tt,mcl):
+        self.mutipleClassifiers=mcl
+        opts = ['Default','CV','Gsearch','Optunity']
+        if self.mutipleClassifiers:opts=['Optunity_mcl']
         self.setParams()
         for i in range(dgts[0],dgts[1]):
             print "\n%s, digit %d "%(self.dataName,i)
             # file setting
+            self.ROCs = {}
             f = open(self.csvname, 'ab+')
             self.csvWriter = csv.writer(f)
             dir_output_dgt =os.path.join(self.dir_output,str(i))
             if not os.path.exists(dir_output_dgt):os.mkdir(dir_output_dgt)
             # initialization
             self.basicResults=[]
-            self.bname = self.dataName+'_'+featureExtr+'_'+str(i)+'_'
+            if self.mutipleClassifiers:
+                self.bname=self.dataName+'_'+featureExtr+'_'+str(i)+'_mcl'+'_'
+            else:
+                self.bname=self.dataName+'_'+featureExtr+'_'+str(i)+'_'
+
             self.basicResults.extend([self.dataName,self.numEx,featureExtr,tt])
             # set Target digit
             self.setTarget(i)
             # Classification
             for param in opts:
-                #model,results = self.buildSVM(param)
-                self.buildModel()
+                if self.mutipleClassifiers:
+                    model,results = self.buildModel(copy.copy(self.basicResults))
+                else:
+                    model,results = self.buildSVM(param,copy.copy(self.basicResults))
                 for data in ['test','train']:
-                    results_=self.evaluateModel(model,copy.copy(results),param,data=data)
+                    results_,_=self.evaluateModel(model,copy.copy(results),param,data=data)
                     # export
                     results_.append(self.fparams)
                     self.csvWriter.writerow(results_)
@@ -64,6 +80,7 @@ class Classification():
         self.cvnum=10
         self.crange = np.logspace(0,2,num=15,base=10.0)
         self.grange = np.logspace(0,2,num=15,base=10.0)
+        self.numFeature= self.xtrain.shape[1]
 
         self.search = {'algorithm': {'k-nn': {'n_neighbors': [1, 5]},
                                 'SVM': {'kernel': {'linear': {'C': [0, 2]},
@@ -72,15 +89,12 @@ class Classification():
                                                    }
                                         },
                                 'naive-bayes': None,
-                                'random-forest': {'n_estimators': [10, 30],
-                                                  'max_features': [5, 20]}
+                                'random-forest': {'n_estimators': [10, 30],'max_features':[2,self.numFeature]}
                                 }
                  }
 
 
     def setTarget(self,targetNumber):
-        #name = self.bname.split('_')[0]+'_'+self.bname.split('_')[2]
-
         # Extract the specific number based on "self.target_names"
         self.target_names =([targetNumber],np.delete(np.linspace(0,9,10,np.int16),targetNumber))
         # class(0:target, 1:rest of all)
@@ -94,18 +108,16 @@ class Classification():
         print "  #val: %d (%d: %d, %d: %d)"%(len(self.labels_vlbi),self.target_names[0][0],len(self.labels_vlbi[self.labels_vlbi==0]),-self.target_names[0][0],len(self.labels_vlbi[self.labels_vlbi==1]))
 
 
-    def buildSVM(self,param):
+    def buildSVM(self,param,results):
         print '\n   '+param
         tt,t=0,time.time()
 
         if np.min(self.cvnum<np.bincount(self.labels_vlbi))<self.cvnum:self.cvnum=np.min(np.bincount(self.labels_vlbi))
-        self.ROCs = {}
-        results = copy.copy(self.basicResults)
-        results.append(param)
+        results.extend(['SVM_rbf',param])
 
         if param == 'Default':
             model =svm.SVC(kernel='rbf',probability=True)
-            results.extend([model.C,model.gamma,0.0])
+            results.extend([model.C,model.gamma])
 
         elif param=='CV':
             av=0
@@ -118,7 +130,6 @@ class Classification():
                         model=svm.SVC(kernel='rbf',C=c,gamma=g,probability=True)
                         tmp=[c,g]
             tt=time.time()-t
-            tmp.append(tt)
             results.extend(tmp)
 
         elif param == 'Gsearch':
@@ -128,7 +139,7 @@ class Classification():
             clf.best_params_['probability']=True
             model=svm.SVC(**clf.best_params_)
             tt =time.time()-t
-            results.extend([clf.best_params_["C"],clf.best_params_["gamma"],tt])
+            results.extend([clf.best_params_["C"],clf.best_params_["gamma"]])
 
         elif param == 'Optunity':
             # set score function: twice iterated 10-fold cross-validated accuracy
@@ -145,34 +156,52 @@ class Classification():
 
             model =svm.SVC(**optimal_pars)
             tt = optimal_pars2.stats["time"]
-            results.extend([optimal_pars["C"],optimal_pars["gamma"],tt])
+            results.extend([optimal_pars["C"],optimal_pars["gamma"]])
+
         print '   %s: %0.2f sec'%(param,tt)
-        print '    C:%0.2f, g:%0.2f'%(float(results[-3]),float(results[-2]))
+        print '    C:%0.2f, g:%0.2f'%(float(results[-2]),float(results[-1]))
+        results.extend(['','','','','',-1,tt])
         return model,results
 
-    def buildModel(self):
-        @optunity.cross_validated(x=self.xtrain, y=self.ytrain, num_folds=10, num_iter=2)
-        def performance(x_train, y_train, x_test, y_test,
-                        algorithm, n_neighbors=None, n_estimators=None, max_features=None,
-                        kernel=None, C=None, gamma=None, degree=None, coef0=None):
-            # fit the model
-            if algorithm == 'k-nn':
-                model = KNeighborsClassifier(n_neighbors=int(n_neighbors))
-                model.fit(x_train, y_train)
-            elif algorithm == 'SVM':
-                model = train_svm(x_train, y_train, kernel, C, gamma, degree, coef0)
-            elif algorithm == 'naive-bayes':
-                model = GaussianNB()
-                model.fit(x_train, y_train)
-            elif algorithm == 'random-forest':
-                model = RandomForestClassifier(n_estimators=int(n_estimators),
-                                               max_features=int(max_features))
-                model.fit(x_train, y_train)
-            else:
-                raise ArgumentError('Unknown algorithm: %s' % algorithm)
 
+    def setModel(self,algorithm=None, n_neighbors=None, n_estimators=None, max_features=None,
+                        kernel=None, C=None, gamma=None, degree=None, coef0=None):
+        params=[algorithm+'_'+str(kernel),'Optunity_mcl',C,gamma,degree,coef0,n_neighbors,n_estimators,max_features]
+        if algorithm == 'k-nn':
+            model = KNeighborsClassifier(n_neighbors=int(n_neighbors))
+        elif algorithm == 'SVM':
+            model = self.train_svm(kernel, C, gamma,degree,coef0)
+        elif algorithm == 'naive-bayes':
+            model = GaussianNB()
+        elif algorithm == 'random-forest':
+            model = RandomForestClassifier(n_estimators=int(n_estimators),max_features=int(max_features))
+        else:
+            raise ArgumentError('Unknown algorithm: %s' % algorithm)
+            return None
+        return model,params
+
+    """A generic SVM training function, with arguments based on the chosen kernel."""
+    def train_svm(self,kernel, C, gamma, degree, coef0):
+        if kernel == 'linear':
+            model = SVC(kernel=kernel, C=C)
+        elif kernel == 'poly':
+            model = SVC(kernel=kernel, C=C, degree=degree, coef0=coef0)
+        elif kernel == 'rbf':
+            model = SVC(kernel=kernel, C=C, gamma=gamma)
+        else:
+            raise ArgumentError("Unknown kernel function: %s" % kernel)
+        return model
+
+
+    def buildModel(self,results):
+        #self.ROCs = {}
+        tt=time.time()
+        @optunity.cross_validated(x=self.xtrain, y=self.ytrain, num_folds=2, num_iter=2)
+        def performance(x_train, y_train, x_test, y_test,**kargs):
+            model,_=self.setModel(**kargs)
+            model.fit(x_train, y_train)
             # predict the test set
-            if algorithm == 'SVM':
+            if kargs['algorithm'] == 'SVM':
                 predictions = model.decision_function(x_test)
             else:
                 predictions = model.predict_proba(x_test)[:, 1]
@@ -181,41 +210,77 @@ class Classification():
 
 
         optimal_configuration, info, _ = optunity.maximize_structured(performance,\
-                                search_space=self.search,num_evals=300)
-        #print(optimal_configuration)
-        #print(info.optimum)
-        #{'kernel': 'poly', 'C': 38.5498046875, 'algorithm': 'SVM', 'degree': 3.88525390625, 'n_neighbors': None, 'n_estimators': None, 'max_features': None, 'coef0': 0.71826171875, 'gamma': None}
-        #0.979302949566
-        #Finally, lets make the results a little bit more readable. All dictionary items in optimal_configuration with value None can be removed.
+                                search_space=self.search,num_evals=50)
 
         solution = dict([(k, v) for k, v in optimal_configuration.items() if v is not None])
-        print('Solution\n========')
         print("\n".join(map(lambda x: "%s \t %s" % (x[0], str(x[1])), solution.items())))
+
+        self.restructInfo(info,results)
+        model,params=self.setModel(**solution)
+        results.extend(params)
+        #print time.time()-tt
+        results.extend([max(info.call_log['values']),time.time()-tt])
+        return model,results
 
 
     def evaluateModel(self,model,results,param,data='test'):
         print '     '+data
         name=self.bname+data+'_'+param
-        results.insert(14,data)
+        #results.insert(19,data)
+        results.append(data)
+
         if data == 'test':
             xpredict,labels_true=self.xtest,self.labels_tebi
         elif data=='train':
             xpredict,labels_true=self.xtrain,self.labels_trbi
 
-        # fit to the test data
-        optimal_model = model.fit(self.xtrain, self.ytrain)
-        ypredict = optimal_model.predict(xpredict)
-        ypredict_score = optimal_model.decision_function(xpredict)
+        model = model.fit(self.xtrain, self.ytrain)
+        ypredict = model.predict(xpredict)
+        if 'SVM' in results[10]:
+            ypredict_score = model.decision_function(xpredict)
+        else:
+            ypredict_score = model.predict_proba(xpredict)
 
         # Evaluate model
         e=Evaluation(labels_true,ypredict,ypredict_score,self.dir_output,name,results,self.target_names)
         results,roc=e.evMain()
-        if not self.ROCs.has_key(data): self.ROCs[data]={param:roc}
-        else:self.ROCs[data].update({param:roc})
+        if self.mutipleClassifiers==False:
+            if not self.ROCs.has_key(data): self.ROCs[data]={param:roc}
+            else:self.ROCs[data].update({param:roc})
 
-        return results
+        return results,roc
+
+    def restructInfo(self,info,results):
+
+        algos=list(set(info.call_log['args']['algorithm']))
+        for alg in algos:
+            result =copy.copy(results)
+            alg_idx = np.where(np.array(info.call_log['args']['algorithm'])==alg)[0]
+            values=np.array([info.call_log['values'][i] for i in alg_idx])
+            idx_max=np.where(values==max(values))[0][0]
+
+            ker=str(np.array([info.call_log['args']['kernel'][i] for i in alg_idx])[idx_max])
+            dics={'algorithm':alg,'kernel':ker}
+            if ker==None: algoname=alg
+            else:algoname=alg+'_'+ker
+            result.extend([algoname,'Optunity_msl'])
+            for key in['C','gamma','degree','coef0','n_neighbors','n_estimators','max_features']:
+                pars= np.array([info.call_log['args'][key][i] for i in alg_idx])
+                result.append(pars[idx_max])
+                dics[key]=pars[idx_max]
+            result.extend([max(values),'time'])
+            model,_=self.setModel(**dics)
+            for data in ['test','train']:
+                results_,roc=self.evaluateModel(model,copy.copy(result),'Optunity_msl',data=data)
+                results_.append(self.fparams)
+                self.csvWriter.writerow(results_)
+
+                if self.mutipleClassifiers:
+                    if not self.ROCs.has_key(data): self.ROCs[data]={algoname:roc}
+                    else:self.ROCs[data].update({algoname:roc})
 
 
+        return
 
     # normalization
     # note that negative value is possible

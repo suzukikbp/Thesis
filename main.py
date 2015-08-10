@@ -27,13 +27,14 @@ from modules.gabor_cv import *
 from modules.gabor_opt1 import *
 
 SHOW=1
-DEBUG=1
+DEBUG=0
 CLS=1
 
 dataSets = ['mnist_basic','mnist_background_images','mnist_background_random','mnist_rotation','mnist_rotation_back_image','mnist_rotation_new']
 #featureExtrs = ['PCA','ChainBlur','Gabor','Gabor_opt1']
 #featureExtrs = ['Gabor_opt1']
-featureExtrs = ['Gabor']
+featureExtrs = ['Gabor_set','PCA','ChainBlur']
+#featureExtrs = ['Gabor_set']
 #opts = ['Default','CV','Gsearch','Optunity']
 solvers = ['particle swarm','grid search','random search','cma-es','nelder-mead']
 #img_tr_all=lab_tr_all=img_te_all=lab_te_all=img_vl_all=lab_vl_all=[]
@@ -45,7 +46,7 @@ if DEBUG==1:
     #featureExtrs = ['PCA']
     #featureExtrs = ['Gabor_opt1']
     #featureExtrs = ['ChainBlur']
-    featureExtrs = ['Gabor']
+    #featureExtrs = ['Gabor']
     #opts = ['Default','Gsearch']
 
 
@@ -61,7 +62,7 @@ if __name__ == '__main__':
     m.trainSize=m.valSize=100
     m.teSize=100 #50000
     m.normalization = False # MNIST is already normalized
-    if DEBUG==1:m.trainSize=m.valSize=m.teSize=40
+    if DEBUG==1:m.trainSize=m.valSize=m.teSize=75#60
 
     # output file setting
     m.csvname=os.path.join(m.dir_output,'basicResults.csv')
@@ -87,7 +88,7 @@ if __name__ == '__main__':
         print '\n'+featureExtr
         bname = m.dataName+'_'+featureExtr+'_'
 
-        digits=[0,5]        # digits number for classification
+        digits=[0,10]        # digits number for classification
         ws_gb=[3,4,5,7]     # candidates of width
         lms_gb=[1,1000]     # lambda range (just for opt1, will be devided by 100)
         nbPhis_gb=[2,4,6,8] # candidates/ range of the the value (should be more than 1)
@@ -100,6 +101,7 @@ if __name__ == '__main__':
         nitrs_gb=[1,2]      # the number of iteration for PSO
 
         if DEBUG ==1:
+            digits=[0,1]
             ks_gb=[3]#[3,9,13]
             ws_gb=[5]#[3,5]
             nbPhis_gb=[6]#,2]#[4,6]
@@ -116,27 +118,33 @@ if __name__ == '__main__':
         if(featureExtr=='PCA'):
             m.xtrain,m.xtest,m.xval,m.fparams = PCA().main([img_tr_all,img_te_all,img_vl_all],m.dir_output,bname)
             print "%s: %0.2f sec, CP:%d" %(featureExtr,(time.time()-t),m.fparams)
-            if CLS==1:m.main(digits,featureExtr,time.time()-t)
+            if CLS==1:
+                mm=copy.copy(m)
+                mm.main(digits,featureExtr,time.time()-t,True)
+                mm.main(digits,featureExtr,time.time()-t,False)
 
         # 2. Chaincode/Bluring
         # directional decomposition of image into directional sub-images
         elif(featureExtr=='ChainBlur'):
             m.xtrain,m.xtest,m.xval=[chaincode(dat,m.pixel,m.dir_output)[0]for dat in[img_tr_all.copy(),img_te_all.copy(),img_vl_all.copy()]]
             print "%s: %0.2f sec" %(featureExtr,(time.time()-t))
-            if CLS==1:m.main(digits,featureExtr,time.time()-t)
+            if CLS==1:
+                mm=copy.copy(m)
+                mm.main(digits,featureExtr,time.time()-t,True)
+                mm.main(digits,featureExtr,time.time()-t,False)
 
         # 3.1 Gabor with static way
         elif(featureExtr=='Gabor'):
-            #kargs={'opt':True,'ws':ws_gb,'nbPhis':nbPhis_gb,'ns':ns_gb}
-            kargs={'opt':False,'ks':13,'sigma':4.645173,'lmd':0.010689,'n':14,'d':2,'nbPhi':4,'alpha':2.312176579,'eccs':0.898335796}
-            #kargs={'opt':False,'ks':3,'sigma':4.242640687,'lmd':6.,'n':14,'d':2,'nbPhi':2,'alpha':1.,'eccs':0.955743598}
+            kargs={'opt':True,'ws':ws_gb,'nbPhis':nbPhis_gb,'ns':ns_gb}
             gab=Gabor(m.pixel,img_tr_all,img_te_all,img_vl_all,\
                         m.dir_input,m.dir_output,m.dataName,**kargs)
             m.xtrain,m.xtest,m.xval,m.fparams=gab.applyGabor()
             #if 'Gabor_cv' in featureExtrs:gab_cv= Gabor_cv(gab)
             print "%s: %0.2f sec" %(featureExtr,(time.time()-t))
-            if CLS==1:m.main(digits,featureExtr,time.time()-t)
-
+            if CLS==1:
+                mm=copy.copy(m)
+                mm.main(digits,featureExtr,time.time()-t,True)
+                mm.main(digits,featureExtr,time.time()-t,False)
 
         # 3.2 Gabor with hyperparameter optimization
         elif(featureExtr=='Gabor_opt1'):
@@ -148,7 +156,22 @@ if __name__ == '__main__':
                             ksizes=ks_gb,ns=ns_gb,optparms=optparms[i])
                 m.xtrain,m.xtest,m.xval,m.fparams=gab.applyGabor()
                 print "%s: %0.2f sec" %(featureExtr,(time.time()-t))
-                if CLS==1:m.main(digits,featureExtr,time.time()-t)
+                if CLS==1:
+                    mm=copy.copy(m)
+                    mm.main(digits,featureExtr,time.time()-t,True)
+                    mm.main(digits,featureExtr,time.time()-t,False)
 
+        # 3.1 Gabor with static way
+        elif(featureExtr=='Gabor_set'):
+            kargs1={'opt':False,'ks':13,'sigma':4.645173,'lmd':0.010689,'n':14,'d':2,'nbPhi':4,'alpha':2.312176579,'eccs':0.898335796}
+            kargs2={'opt':False,'ks':3,'sigma':4.242640687,'lmd':6.,'n':14,'d':2,'nbPhi':2,'alpha':1.,'eccs':0.955743598}
+            for kargs in [kargs1,kargs2]:
+                gab=Gabor(m.pixel,img_tr_all,img_te_all,img_vl_all,\
+                            m.dir_input,m.dir_output,m.dataName,**kargs)
+                m.xtrain,m.xtest,m.xval,m.fparams=gab.applyGabor()
+                if CLS==1:
+                    mm=copy.copy(m)
+                    mm.main(digits,featureExtr,time.time()-t,True)
+                    mm.main(digits,featureExtr,time.time()-t,False)
     print "finish"
 

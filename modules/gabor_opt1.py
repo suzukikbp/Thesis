@@ -32,7 +32,7 @@ class Gabor_opt1(Gabor):
                 optparms=[3,4,2,1]):
 
         self.SHOW = 0
-        self.DEBUG = 1
+        self.DEBUG = 0
         self.EXP = True
         self.width=-1
         if self.DEBUG==1:print 'DEBUG MODE'

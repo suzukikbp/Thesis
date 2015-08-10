@@ -16,7 +16,7 @@ from modules.preposs import *
 class Gabor():
     def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,**kargs):
         self.SHOW = 0
-        self.DEBUG = 1
+        self.DEBUG = 0
         self.EXP = True
         if self.DEBUG==1:print 'DEBUG MODE'
 
