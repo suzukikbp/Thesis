@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 
-import csv,os,sys
+import csv,os,sys,copy
 import numpy as np
 from operator import itemgetter, attrgetter
 
@@ -64,37 +64,123 @@ def makeTable2(objs):
 
 
 if __name__ == '__main__':
-    dir_input = "..\data\input"
-    dir_output = "..\data\output"
+    dir_input = r'..\data\input'
+    dir_output = r'..\data\output\00_resume_0817'
+    filename='basicResults_1439740619.csv'
     SHOW=False
+
+    # output  data
+    f = open(os.path.join(dir_output,filename.split('.')[0]+'_optSVM.csv'), 'wb')
+    writer = csv.writer(f)
+    f2 = open(os.path.join(dir_output,filename.split('.')[0]+'_optClsf.csv'), 'wb')
+    writer2 = csv.writer(f2)
 
     #######################
     # load data
     #######################
-    reader = csv.reader(open(os.path.join(dir_output,'basicResults.csv'), 'rb'), delimiter=',')
+    reader = csv.reader(open(os.path.join(dir_output,filename), 'rb'), delimiter=',')
     #header
-    fieldnames = next(reader)
-    ncol = len(fieldnames)
+    fnams = next(reader)
+    ncol = len(fnams)
     arr = [[0 for i in range(0)] for j in range(ncol)]
+
+
+
+    def getVal(row,fieldname):
+        return row[fnams.index(fieldname)]
+
+    def setDic(dictionary,row,fieldname):
+        dictionary.setdefault(getVal(row,fieldname),'')
+        return dictionary[getVal(row,fieldname)]
+
     # load csv
-    for row in reader:
+    for r in reader:
         for i in range(0,ncol):
-            if ncol == 1:arr[i].append(int(row[i]))
+            if ncol == 1:arr[i].append(int(r[i]))
             try:
-                arr[i].append(float(row[i]))
+                arr[i].append(float(r[i]))
             except ValueError:
-                arr[i].append(str(row[i]))
+                arr[i].append(str(r[i]))
+    arr=np.array(arr)
+    data=copy.copy(arr)
 
     #######################
     # select datas
     #######################
 
+    def getData(dat,field_name,value):
+        dat = dat[:,dat[fnams.index(field_name)]==value]
+        return dat
+
+    exportFields=['CLASW','Feature','FeatureParams','optimization','target1','C','gamma','Weight','time','ROC_opt','ROC']
+    writer.writerow(exportFields)
+    for clsw in np.unique(data[fnams.index('CLASW')]):
+        data1 = getData(data,'CLASW',clsw)
+        #for feat in np.unique(data[fnams.index('Feature')]):
+        for feat in ['PCA','ChainBlur','Gabor_set']:
+            writer.writerow([])
+            writer.writerow([])
+            data2 =  getData(data1,'Feature',feat)
+            for feat2 in np.unique(data[fnams.index('FeatureParams')]):
+                data3 =  getData(data2,'FeatureParams',feat2)
+                #for opt in np.unique(data[fnams.index('optimization')]):
+                for opt in ['Default','Gsearch','Optunity']:
+                    data4 =  getData(data3,'optimization',opt)
+                    for dgt in np.unique(data[fnams.index('target1')]):
+                        data5 =  getData(data4,'target1',dgt)
+                        data5_te =  getData(data5,'Prediction','test')
+                        data5_tr =  getData(data5,'Prediction','train')
+
+                        if data5.shape[1]!=0:
+                            ex=[]
+                            for field in exportFields:
+                                ex.append(data5_tr[fnams.index(field)][0])
+                            ex.append(data5_te[fnams.index('ROC')][0])
+                            writer.writerow(ex)
+    f.close()
+
+
+
+    exportFields1=['CLASW','Feature','FeatureParams','optimization','target1','Classifier','C','gamma','degree','coef0','Weight','n_estimators','max_features','ROC_opt','ROC']
+    exportFields2=['ROC','time']
+    writer2.writerow(exportFields1+exportFields2)
+    for clsw in np.unique(data[fnams.index('CLASW')]):
+        data1 = getData(data,'CLASW',clsw)
+        for feat in ['PCA','ChainBlur','Gabor_set']:
+            writer2.writerow([])
+            writer2.writerow([])
+            writer2.writerow([])
+            data2 =  getData(data1,'Feature',feat)
+            for feat2 in np.unique(data[fnams.index('FeatureParams')]):
+                data3 =  getData(data2,'FeatureParams',feat2)
+                for opt in ['Optunity_mcl']:
+                    data4 =  getData(data3,'optimization',opt)
+                    for dgt in np.unique(data[fnams.index('target1')]):
+                        data5 =  getData(data4,'target1',dgt)
+                        data5_te =  getData(data5,'Prediction','test')
+                        data5_tr =  getData(data5,'Prediction','train')
+
+                        if data5.shape[1]!=0:
+                            ex=[]
+                            for field in exportFields1:
+                                ex.append(data5_tr[fnams.index(field)][0])
+                            for field in exportFields2:
+                                ex.append(data5_te[fnams.index(field)][0])
+                            writer2.writerow(ex)
+
+    f2.close()
+
+
+    print 'finish'
+
+    """
+
     # ----- select fileds
     strs = ''
     for i in range(0,ncol):
-        st = 'No. %d: %s'%(i,str(fieldnames[i]))
+        st = 'No. %d: %s'%(i,str(fnams[i]))
         print st
-        dat_b[str(fieldnames[i])]=np.array(arr[i])
+        dat_b[str(fnams[i])]=np.array(arr[i])
         strs+=st+'\n'
     try:
         dat_b['ID']=dat_b['ID'].astype(np.int32)
@@ -119,12 +205,12 @@ if __name__ == '__main__':
     for fno in fields.split(','):
         i +=1
         fno = int(fno)
-        labels.append(fieldnames[fno])
+        labels.append(fnams[fno])
         strs2 += 'N,'
         if type(arr[fno][0])==str:
-            strs3 +='No. %d (%d): %s       %s\n'%(i,fno,str(fieldnames[fno]),str(list(set(arr[fno]))))
+            strs3 +='No. %d (%d): %s       %s\n'%(i,fno,str(fnams[fno]),str(list(set(arr[fno]))))
         else:
-            strs3 +='No. %d (%d): %s       %s\n'%(i,fno,str(fieldnames[fno]),str([min(arr[fno]),max(arr[fno])]))
+            strs3 +='No. %d (%d): %s       %s\n'%(i,fno,str(fnams[fno]),str([min(arr[fno]),max(arr[fno])]))
     if SHOW:
         constraints=raw_input('Constraints %d \n\n %s '%(len(fields.split(',')),strs3))
     else:
@@ -161,21 +247,7 @@ if __name__ == '__main__':
     print sorts
 
     str_all=makeTable2(objs)
-    #######################
-    # output
-    #######################
-    f = open(os.path.join(dir_output,'test.txt'), 'wb')
-    f.write(str_all)
-    #for row in outputs:
-    #    f.write(row)
-    f.close()
-
-#2,11,12,13
-
-
-
-
-
+    """
 
 
 

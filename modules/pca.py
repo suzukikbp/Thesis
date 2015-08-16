@@ -22,8 +22,8 @@ class PCA():
         eigenvalues,eigenvectors = eigenvalues[:cp],eigenvectors[:,:cp]
 
         # 3. projection
-        xtrain,xtest,xval = [self.pca_project(eigenvectors,dat,mu)for dat in datas]
-        return xtrain,xtest,xval,cp
+        data_prj = [self.pca_project(eigenvectors,dat,mu)for dat in datas]
+        return data_prj+[cp]
 
     def pca_project(self,W, X, mu=None):
         if mu is None:

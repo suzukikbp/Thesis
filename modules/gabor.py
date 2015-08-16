@@ -16,15 +16,15 @@ from modules.preposs import *
 class Gabor():
     def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,**kargs):
         self.SHOW = 0
-        self.DEBUG = 0
         self.EXP = True
-        if self.DEBUG==1:print 'DEBUG MODE'
-
+        self.DEBUG = kargs['DEBUG']
+        self.ALPHA = False
         # 1. Set initial Parameters
         self.dir_input,self.dir_output,self.bname = dir_in,dir_out,bname
         self.img_tr,self.img_te,self.img_vl=img_tr,img_te,img_vl
         self.pixel=pixel
         self.results=[str(dir_out.split('\\')[-1])]
+        self.alpha=-1
         csvname=os.path.join(os.path.dirname(dir_out),'gabourResults.csv')
         self.f = open(csvname, 'ab+')
         self.csvWriter = csv.writer(self.f)
@@ -44,7 +44,7 @@ class Gabor():
         self.eccs=kargs['eccs']
         self.width=-1
         self.phis=np.linspace(-np.pi/2,np.pi/4,self.nbPhi)
-        print '    === Set params ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
+        #print '    === Set params ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
 
     # optimize parameters
     def optParams(self,**kargs):
@@ -79,14 +79,8 @@ class Gabor():
         self.D = ps[1][3]
 
         # Additional regulation
-        self.setAlpha()
-
-        #  Export results
-        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
-        self.csvWriter.writerow(self.results)
-        self.f.close()
-        del self.csvWriter,self.f
-
+        if self.ALPHA:self.setAlpha()
+        else:self.results.extend(['','','','','',''])
 
 
     # N:the number of block in the images
@@ -177,40 +171,48 @@ class Gabor():
         for i in range(0,len(alphas)):
             lab[i]='alpha:%.1f'%alphas[i]
         drawimg(gbs+gbas,lab,self.dir_output,self.bname+'_alpha_',self.pixel,ncol=len(alphas),nrow=2,skip=False)
-        self.plotScatter(gbrs,'Original Gabor filter','Addaptive regulated Gabor filter','Gabor filter after addRegulation',labels=alphas)
+        self.plotMultiScatter(gbrs,'Original Gabor filter','Addaptive regulated Gabor filter','Gabor filter after addRegulation',labels=alphas)
         self.results.append(str(round(time.time()-tt,3)))
         print '    Adaptive regulation:%.2f'%(time.time()-tt)
 
 
     #####################################################################
-    def applyGabor(self):
+    def applyGabor(self,val=False,opt=True):
     #####################################################################
-
         # 1. Set Gabor kernel with optimal params
         self.kers = [] # kernels (each phi)
         for phi in self.phis:
             self.kers.append(self.buildKernel(self.ksize,self.sigma, phi ,self.lamda))
         self.kers=np.array(self.kers)
-        print '    === Optimal patams ===\n    w:%d, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
+        print '    === Optimal patams ===\n    w:%d,lm:%.2f,#phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,alpa:%.2f'%(self.width,self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.alpha)
+        #print '    === Optimap params ===\n    w:_, lm:%.2f, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,AECCS:%.3f'%(self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.eccs)
 
         #################################
         # 2. Produce output image and extract features: local histgram
         self.blocksize = 5
         self.tau = 6
         brange =self.blocksize/2
-        print '    Feature selection train/test/val'
-        hist_tr,hist_te,hist_vl = [self.extractFeatures(dat,brange)for dat in [self.img_tr,self.img_te,self.img_vl]]
-
+        print '    Feature selection train/test/(val)'
+        if val:datas=[self.img_tr,self.img_te,self.img_vl]
+        else:datas=[self.img_tr,self.img_te]
+        hists = [self.extractFeatures(dat,brange)for dat in datas]
         #################################
         # 3. Compress dimentionality : PCA
-        xtrain,xtest,xval,cp = PCA().main([hist_tr,hist_te,hist_vl],self.dir_output,self.bname)
-        print '    PCA: %dcp'%cp
+        pcas = PCA().main(hists,self.dir_output,self.bname)
+        cp=pcas[-1]
 
         #################################
-
+        print '    PCA: %dcp'%cp
         params = '%s;%s;%s;%s;%s;%s;%s;%s;%s'%(str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp))
-        return [xtrain, xtest,xval,params]
 
+        # 4. Export results
+        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
+        if opt:self.csvWriter.writerow(self.results)
+        self.f.close()
+        del self.csvWriter,self.f
+
+        if val:return pcas[:-1]+[params]
+        else:return pcas[:-1]+[None,params]
 
 #####################################################################
 #### Functions ######################################################
@@ -464,7 +466,7 @@ class Gabor():
             rmse_lam = rmse_lam/(len(self.phis)*len(imgs))
             rmses_lam.append(rmse_lam)
             maxOuts_lam.append(maxOut_lam/(len(self.phis)*len(imgs)))
-        #if plot==True: self.plotScatter([gbr.flatten(),gbr_ad.flatten()],'Original Gabor filter','Addaptive regulated Gabor filter','Gabor filter after addRegulation')
+        self.plotMultiScatter([[gbr.flatten(),gbr_ad.flatten()]],'Original Gabor filter','Addaptive regulated Gabor filter','Gabor filter Regulation %1.3f'%alpha)
         return np.array(rmses_lam),np.array(maxOuts_lam),gbr.flatten(),gbr_ad.flatten()
 
     # Build histoggram
@@ -553,7 +555,7 @@ class Gabor():
         plt.close()
 
 
-    def plotScatter(self,xy,xlab,ylab,name,tnam='',dir_o='',labels=[]):
+    def plotMultiScatter(self,xy,xlab,ylab,name,tnam='',dir_o='',labels=[]):
         if(len(plt.get_fignums())>0):plt.close()
         if len(xy)==1:plt.scatter(xy[0][0],xy[0][1])
         else:# for multiple dataset
@@ -568,6 +570,8 @@ class Gabor():
             cb.set_label('Alpha')
         plt.xlabel(xlab)
         plt.ylabel(ylab)
+        plt.ylim((0,1))
+        plt.xlim((0,1))
         if tnam != '':plt.title(tnam)
         if dir_o == '':dir_o=self.dir_output
         plt.savefig(os.path.join(dir_o,name+'.png'))

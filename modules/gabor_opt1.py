@@ -27,15 +27,16 @@ solvers = ['particle swarm','grid search','random search','cma-es','nelder-mead'
 
 class Gabor_opt1(Gabor):
     def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,\
-                ws=[5],lms=[1],sigmas=[5],nbPhis=[4],ksizes=[3],ns=[7],
+                ws=[5],lms=[1],sigmas=[5],nbPhis=[4],ksizes=[3],ns=[7],DEBUG=0,\
                 #numg=3,nump=4,nfol=2,nitr=1):
-                optparms=[3,4,2,1]):
+                optparms=[5,10,4,10]):
 
         self.SHOW = 0
-        self.DEBUG = 0
+        self.DEBUG = DEBUG
         self.EXP = True
         self.width=-1
-        if self.DEBUG==1:print 'DEBUG MODE'
+        self.alpha=-1
+        self.ALPHA = False
 
         # 1. Set initial Parameters
         self.dir_input,self.dir_output,self.bname = dir_in,dir_out,bname
@@ -48,8 +49,6 @@ class Gabor_opt1(Gabor):
         self.csvWriter = csv.writer(self.f)
 
         # 2. Optimize parameters
-        #numg,nump=3,4
-        #nfol,nitr=2,1
         @optunity.cross_validated(x=self.img_tr, num_folds=nfol, num_iter=nitr)
         def set_sigma(x_train,x_test,lamda,nbPhi,n,ksize,sigma):
             self.exportImgs=[]
@@ -88,17 +87,13 @@ class Gabor_opt1(Gabor):
         self.phis=np.linspace(-np.pi/2,np.pi/4,self.nbPhi)
         self.eccs=min(np.array(optpars2.call_log['values']))
         # export
-        print '    === Optimap params ===\n    w:_, lm:%.2f, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,AECCS:%.3f'%(self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.eccs)
+        #print '    === Optimap params ===\n    w:_, lm:%.2f, #phis:%d, ksize:%d, D:%d(N:%d),sig:%.3f,AECCS:%.3f'%(self.lamda,self.nbPhi,self.ksize,self.D,self.N,self.sigma,self.eccs)
         self.results.extend([solvers[0],str(numg),str(nump),str(nfol),str(nitr),str(optpars2.stats['time'])])
 
         # 4. Set optimal param for additional regulation
-        self.setAlpha(numg=numg,nump=nump,nfol=nfol,nitr=nitr)
+        if self.ALPHA:self.setAlpha(numg=numg,nump=nump,nfol=nfol,nitr=nitr)
+        else:self.results.extend(['','','','','',''])
 
-        #  Export results
-        self.results.extend([str(self.width),str(self.ksize),str(self.sigma),str(self.lamda),str(len(self.phis)),str(self.alpha),str(self.blocksize),str(self.tau),str(cp),str(self.eccs)])
-        self.csvWriter.writerow(self.results)
-        self.f.close()
-        del self.csvWriter,self.f
 
 # Adaptive regulation of outputs of Gabor filters
 #####################################################################
@@ -120,9 +115,16 @@ class Gabor_opt1(Gabor):
             print '    alpha: %.3f, rmse_sum: %.3f'%(alpha,rmses_lam.sum())
             return rmses_lam.sum()
 
-        solver = optunity.make_solver(solvers[0],alpha=[min(alphas),max(alphas)],\
-                    num_particles=nump, num_generations=numg)
-        optpars, optpars2 = optunity.optimize(solver,alpha_loss,maximize=False)
+        #solver = optunity.make_solver(solvers[0],alpha=[min(alphas),max(alphas)],\
+        #            num_particles=nump, num_generations=numg)
+        #optpars, optpars2 = optunity.optimize(solver,alpha_loss,maximize=False)
+        kwargs = {'alpha':[min(alphas),max(alphas)]}
+        optpars, optpars2, optpars3 = optunity.minimize(alpha_loss,**kwargs)
+
+        num_gen=optpars3['num_generations']
+        num_par=optpars3['num_particles']
+
+        print num_gen,num_par
 
         # 3. Set parameters
         self.alpha=optpars['alpha']

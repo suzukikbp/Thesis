@@ -13,11 +13,39 @@
 import os,time
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import precision_recall_curve,auc,confusion_matrix,accuracy_score,classification_report,roc_curve
 from sklearn import cross_validation
 
+
+
+def plotScatter(xy,xlab,ylab,name,tnam='',dir_o='',labels=[],cl=True,log=False):
+    if(len(plt.get_fignums())>0):plt.close()
+    if len(xy)==1:
+        xy=np.vstack([xy[0],np.linspace(1,xy[0].shape[1],xy[0].shape[1])])
+        colors = cm.jet(np.linspace(0, 1, xy.shape[1]))
+        if cl:plt.scatter(xy[0],xy[1],color=colors)
+        else:plt.scatter(xy[0],xy[1])
+    else:# for multiple dataset
+        x = np.arange(len(xy))
+        ys = [i+x+(i*x)**2 for i in range(len(xy))]
+        colors = cm.jet(np.linspace(0, 1, len(ys)))
+        for i in range(0,len(xy)):
+            plt.scatter(xy[i][0],xy[i][1],color=colors[i])
+        m = cm.ScalarMappable(cmap=cm.jet)
+        m.set_array(labels)
+        cb = plt.colorbar(m)
+        cb.set_label('Alpha')
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    if log:
+        plt.xscale('log')
+        plt.yscale('log')
+    if tnam != '':plt.title(tnam)
+    plt.savefig(os.path.join(dir_o,name+'.png'))
+    plt.close()
 
 # ROC curve drawing
 def multipleROC(dictionary,odir,name):
@@ -73,7 +101,7 @@ class Evaluation():
 
     def ev_ROC(self):
         #self.fpr, tpr, thresholds = roc_curve(self.labels_true, self.ypredict_score[:, 1], pos_label=1)
-        self.fpr, tpr, thresholds = roc_curve(self.labels_true, self.ypredict_score[:, 0], pos_label=1)
+        self.fpr, tpr, thresholds = roc_curve(self.labels_true, self.ypredict_score, pos_label=1)
         if np.isnan(self.fpr)[0] == False: # check if NaN
             roc_auc=auc(self.fpr,tpr)
             #plotROC(self.fpr,tpr,roc_auc,os.path.join(self.dir_output,self.name+'_roc'))
@@ -85,7 +113,7 @@ class Evaluation():
     # Precision-Recall　
     def ev_precisionRecall(self):
         #precision, recall, thresholds = precision_recall_curve(self.labels_true, self.ypredict_score[:, 1],pos_label=1)
-        precision, recall, thresholds = precision_recall_curve(self.labels_true, self.ypredict_score[:, 0],pos_label=1)
+        precision, recall, thresholds = precision_recall_curve(self.labels_true, self.ypredict_score,pos_label=1)
         if np.isnan(self.fpr)[0] == False:
             area = auc(recall, precision)
             #pre_recall(labels_true, ypredict_score[:, 1],os.path.join(dir_output,name+'_pr'))
