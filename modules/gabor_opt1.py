@@ -26,7 +26,7 @@ from modules.gabor import *
 solvers = ['particle swarm','grid search','random search','cma-es','nelder-mead']
 
 class Gabor_opt1(Gabor):
-    def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,\
+    def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,dir_data,bname,\
                 ws=[5],lms=[1],sigmas=[5],nbPhis=[4],ksizes=[3],ns=[7],DEBUG=0,\
                 #numg=3,nump=4,nfol=2,nitr=1):
                 optparms=[5,10,4,10]):
@@ -39,12 +39,12 @@ class Gabor_opt1(Gabor):
         self.ALPHA = False
 
         # 1. Set initial Parameters
-        self.dir_input,self.dir_output,self.bname = dir_in,dir_out,bname
+        self.dir_input,self.dir_output,self.dir_data,self.bname = dir_in,dir_out,dir_data,bname
         self.img_tr,self.img_te,self.img_vl=img_tr,img_te,img_vl
         self.pixel=pixel
         numg,nump,nfol,nitr=optparms[0],optparms[1],optparms[2],optparms[3]
         self.results=[str(dir_out.split('\\')[-1])]
-        csvname=os.path.join(os.path.dirname(dir_out),'gabourResults.csv')
+        csvname=os.path.join(os.path.dirname(dir_out),'gabourResults'+bname+'.csv')
         self.f = open(csvname, 'ab+')
         self.csvWriter = csv.writer(self.f)
 

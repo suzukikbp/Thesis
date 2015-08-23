@@ -64,9 +64,12 @@ def makeTable2(objs):
 
 
 if __name__ == '__main__':
+
+    date='00_resume_0824'
+    #filename='results_mnist_basic.csv'
+    filename='results_mnist_background_images.csv'
     dir_input = r'..\data\input'
-    dir_output = r'..\data\output\00_resume_0817'
-    filename='basicResults_1439740619.csv'
+    dir_output = r'..\data\output\%s'%date
     SHOW=False
 
     # output  data
@@ -112,61 +115,68 @@ if __name__ == '__main__':
         dat = dat[:,dat[fnams.index(field_name)]==value]
         return dat
 
-    exportFields=['CLASW','Feature','FeatureParams','optimization','target1','C','gamma','Weight','time','ROC_opt','ROC']
+    exportFields=['Dataset','CLASW','Feature','FeatureParams','optimization','target1','C','gamma','Weight','time','ROC_opt','ROC']
     writer.writerow(exportFields)
     for clsw in np.unique(data[fnams.index('CLASW')]):
         data1 = getData(data,'CLASW',clsw)
         #for feat in np.unique(data[fnams.index('Feature')]):
-        for feat in ['PCA','ChainBlur','Gabor_set']:
-            writer.writerow([])
-            writer.writerow([])
+        for feat in ['PCA','ChainBlur','Gabor_set','Gabor_opencv','Bilateral','Canny','HOG','All_f11']:
+            #writer.writerow([])
+            #writer.writerow([])
             data2 =  getData(data1,'Feature',feat)
-            for feat2 in np.unique(data[fnams.index('FeatureParams')]):
+            for feat2 in sorted(np.unique(data[fnams.index('FeatureParams')]),reverse=True):
                 data3 =  getData(data2,'FeatureParams',feat2)
-                #for opt in np.unique(data[fnams.index('optimization')]):
-                for opt in ['Default','Gsearch','Optunity']:
-                    data4 =  getData(data3,'optimization',opt)
-                    for dgt in np.unique(data[fnams.index('target1')]):
-                        data5 =  getData(data4,'target1',dgt)
-                        data5_te =  getData(data5,'Prediction','test')
-                        data5_tr =  getData(data5,'Prediction','train')
+                if 0 < data3.shape[1]:
+                    writer.writerow([])
+                    writer.writerow([])
+                    #for opt in np.unique(data[fnams.index('optimization')]):
+                    for opt in ['Default','Gsearch','Optunity']:
+                        data4 =  getData(data3,'optimization',opt)
+                        for dgt in np.unique(data[fnams.index('target1')]):
+                            data5 =  getData(data4,'target1',dgt)
+                            data5_te =  getData(data5,'Prediction','test')
+                            data5_tr =  getData(data5,'Prediction','train')
 
-                        if data5.shape[1]!=0:
-                            ex=[]
-                            for field in exportFields:
-                                ex.append(data5_tr[fnams.index(field)][0])
-                            ex.append(data5_te[fnams.index('ROC')][0])
-                            writer.writerow(ex)
+                            if data5.shape[1]!=0:
+                                ex=[]
+                                for field in exportFields:
+                                    ex.append(data5_tr[fnams.index(field)][0])
+                                ex.append(data5_te[fnams.index('ROC')][0])
+                                writer.writerow(ex)
     f.close()
 
 
 
-    exportFields1=['CLASW','Feature','FeatureParams','optimization','target1','Classifier','C','gamma','degree','coef0','Weight','n_estimators','max_features','ROC_opt','ROC']
+    exportFields1=['Dataset','CLASW','Feature','FeatureParams','optimization','target1','Classifier','C','gamma','degree','coef0','Weight','n_estimators','max_features','ROC_opt','ROC']
     exportFields2=['ROC','time']
     writer2.writerow(exportFields1+exportFields2)
     for clsw in np.unique(data[fnams.index('CLASW')]):
         data1 = getData(data,'CLASW',clsw)
-        for feat in ['PCA','ChainBlur','Gabor_set']:
-            writer2.writerow([])
-            writer2.writerow([])
-            writer2.writerow([])
+        for feat in ['PCA','ChainBlur','Gabor_set','Gabor_opencv','Bilateral','Canny','HOG','All_f11']:
+            #writer2.writerow([])
+            #writer2.writerow([])
+            #writer2.writerow([])
             data2 =  getData(data1,'Feature',feat)
             for feat2 in np.unique(data[fnams.index('FeatureParams')]):
                 data3 =  getData(data2,'FeatureParams',feat2)
-                for opt in ['Optunity_mcl']:
-                    data4 =  getData(data3,'optimization',opt)
-                    for dgt in np.unique(data[fnams.index('target1')]):
-                        data5 =  getData(data4,'target1',dgt)
-                        data5_te =  getData(data5,'Prediction','test')
-                        data5_tr =  getData(data5,'Prediction','train')
+                if 0 < data3.shape[1]:
+                    writer2.writerow([])
+                    writer2.writerow([])
+                    writer2.writerow([])
+                    for opt in ['Optunity_mcl']:
+                        data4 =  getData(data3,'optimization',opt)
+                        for dgt in np.unique(data[fnams.index('target1')]):
+                            data5 =  getData(data4,'target1',dgt)
+                            data5_te =  getData(data5,'Prediction','test')
+                            data5_tr =  getData(data5,'Prediction','train')
 
-                        if data5.shape[1]!=0:
-                            ex=[]
-                            for field in exportFields1:
-                                ex.append(data5_tr[fnams.index(field)][0])
-                            for field in exportFields2:
-                                ex.append(data5_te[fnams.index(field)][0])
-                            writer2.writerow(ex)
+                            if data5.shape[1]!=0:
+                                ex=[]
+                                for field in exportFields1:
+                                    ex.append(data5_tr[fnams.index(field)][0])
+                                for field in exportFields2:
+                                    ex.append(data5_te[fnams.index(field)][0])
+                                writer2.writerow(ex)
 
     f2.close()
 

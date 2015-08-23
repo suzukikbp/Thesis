@@ -50,40 +50,54 @@ Module ``datasets.mnist_basic`` gives access to the MNIST basic dataset.
 
 
 import numpy as np
-import os,time,sys,cv2
+import os,time,sys,cv2,zipfile,tarfile,shutil
 from sklearn import svm, datasets
 import mlpython.misc.io as mlio
 import pylab
 import matplotlib.pyplot as plt
 
-#Downloads the MNIST dataset
+
+#Download MNIST dataset
 def obtain(dir_path,kind):
     import urllib
     tt = time.time()
-    print 'Downloading the dataset'
+    print 'Download: '+kind
 
-    ## Download the main zip file
+    # Download the zip/tar file
     dir_path = os.path.expanduser(dir_path)
     if(kind=='mnist_basic'):
         urllib.urlretrieve('http://www.iro.umontreal.ca/~lisa/icml2007data/mnist.zip',os.path.join(dir_path,kind+'.zip'))
+    elif 'noise' in kind:
+        urllib.urlretrieve('http://www.iro.umontreal.ca/~lisa/icml2007data/'+kind+'.tar.gz',os.path.join(dir_path,kind+'.tar.gz'))
     else:
         urllib.urlretrieve('http://www.iro.umontreal.ca/~lisa/icml2007data/'+kind+".zip",os.path.join(dir_path,kind+'.zip'))
+    print "Finish downloading : %.1f sec" %((time.time()-tt))
 
-    # Extract the zip file
-    """
-    print 'Extracting the dataset'
-    import zipfile
-    fh = open(os.path.join(dir_path,'mnist_basic.zip'), 'rb')
+    # Unpack and make validation data
+    if 'noise' in kind:
+        untar(dir_path,kind)
+        makeValid_noise(dir_path,kind)
+    else:
+        unzip(dir_path,kind)
+        makeValid(dir_path,kind)
+
+# Extract a zip file
+def unzip(dir_path,kind):
+    print 'Extract zip: ', kind
+    fh = open(os.path.join(dir_path,kind+'.zip'), 'rb')
     z = zipfile.ZipFile(fh)
     for name in z.namelist():
-        outfile = open(os.path.join(dir_path, name), 'wb')
-        outfile.write(z.read(name))
-        outfile.close()
+        z.extract(name,dir_path)
     fh.close()
-    """
-    print "Finish downloading : %.1f sec" %((time.time()-tt))
-    print "You need to unzip downloaded data by hand"
-    sys.exit()
+
+# Extract a tar file
+def untar(dir_path,kind):
+    print 'Extract tar.gz: ', kind
+    tar = tarfile.open(os.path.join(dir_path,kind+'.tar.gz'), 'r')
+    for item in tar:
+        tar.extract(item, dir_path)
+        if item.name.find(".tgz") != -1 or item.name.find(".tar") != -1:
+            extract(item.name, "./" + item.name[:item.name.rfind('/')])
 
 # Add the lines of the file into a list
 def getLines(fp,name,show=True):
@@ -104,12 +118,10 @@ def checkLines(dir_path,kind):
     getLines(open(test_file_path),'test')
 
 # Split data in valid file and train file
-def makeVarid(dir_path,kind):
-
+def makeValid(dir_path,kind):
     train_file_path = os.path.join(dir_path,kind+'_train.amat')
     valid_file_path = os.path.join(dir_path,kind+'_valid.amat')
     test_file_path = os.path.join(dir_path,kind+'_test.amat')
-
     lineList=getLines(open(train_file_path),'train',show=False)
 
     # Create valid file and train file
@@ -128,12 +140,46 @@ def makeVarid(dir_path,kind):
     print "Total line " +"train"+" "+str(c)
     print "Total line " +"valid"+" "+str(len(lineList)-c)
     getLines(open(test_file_path),'test',show=True)
-
     valid_file.close()
     train_file.close()
-
     ## Delete Temp file
     #os.remove(os.path.join(dir_path,'mnist_basic.zip'))
+
+# Split data in valid file and train file
+def makeValid_noise(dir_path,kind):
+    for i in range(1,7):
+        train_file_path =os.path.join(dir_path,kind+'s_all_'+str(i)+'_train.amat')
+        shutil.copy2(os.path.join(dir_path,kind+'s_all_'+str(i)+'.amat'), train_file_path)
+        valid_file_path = os.path.join(dir_path,kind+'s_all_'+str(i)+'_valid.amat')
+        test_file_path = os.path.join(dir_path,kind+'s_all_'+str(i)+'_test.amat')
+
+        lineList=getLines(open(train_file_path),'train',show=False)
+
+        # Create valid file and train file
+        valid_file = open(valid_file_path, "w")
+        train_file = open(train_file_path, "w")
+        test_file = open(test_file_path, "w")
+
+        # Write lines into valid file and train file
+        c=cc=0
+        for j, line in enumerate(lineList):#line = 28*28
+            if ((j + 1) > 6000):
+                test_file.write(line)
+            elif ((j + 1) > 5000):
+                cc+=1
+                valid_file.write(line)
+            else:
+                c=c+1
+                train_file.write(line)
+
+        print "noiselevel: "+str(i)
+        print "  Total line " +"train"+" "+str(c)
+        print "  Total line " +"valid"+" "+str(cc)
+        print "  Total line " +"test"+" "+str(len(lineList)-c-cc)
+        valid_file.close()
+        train_file.close()
+        test_file.close()
+
 
 #Loads the MNIST basic dataset
 def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
@@ -161,16 +207,16 @@ def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
         # validation data
         images_val = (datas["valid"][0].mem_data[0]).astype(np.float32)
         labels_val = (datas["valid"][0].mem_data[1]).astype(np.int32)
-
-
         return [images_tr,labels_tr,images_val,labels_val,images_te,labels_te]
 
-
-    train_file,valid_file,test_file = [os.path.join(dir_path, 'mnist_basic_' + ds + '.amat') for ds in ['train','valid','test']]
+    train_file,valid_file,test_file = [os.path.join(dir_path, kind+'_' + ds + '.amat') for ds in ['train','valid','test']]
     # Get data
     train,valid,test = [mlio.load_from_file(f,load_line) for f in [train_file,valid_file,test_file]]
     lengths = [min(trlen,10000), min(vlen,2000), min(50000,telen)]
-    train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
+    #train,valid,test = [mlio.MemoryDataset(d,[(input_size,),(1,)],[np.float64,int],l) for d,l in zip([train,valid,test],lengths)]
+    train=mlio.MemoryDataset(train,[(input_size,),(1,)],[np.float64,int],lengths[0])
+    valid=mlio.MemoryDataset(valid,[(input_size,),(1,)],[np.float64,int],lengths[1])
+    test=mlio.MemoryDataset(test,[(input_size,),(1,)],[np.float64,int],lengths[2])
 
     # Get metadata
     train_meta,valid_meta,test_meta = [{'input_size':input_size,'targets':targets} for l in lengths]
@@ -178,22 +224,7 @@ def load(dir_path,kind,pixel,trlen=100,vlen=100,telen=1000):
     print "Loading", int(time.time()-tt),"sec"
     return setToVariable({'train':(train,train_meta),'valid':(valid,valid_meta),'test':(test,test_meta)})
 
-"""
-def selectNum(images,labels,nums):
-    imglist=[]
-    lbllist=[]
-    lbllist_binary=[]
-    for i in range(0,len(labels)):
-        if(labels[i] in nums[0]):
-            lbllist.append(labels[i])
-            imglist.append(images[i])
-            lbllist_binary.append(0)
-        elif(labels[i] in nums[1]):
-            lbllist.append(labels[i])
-            imglist.append(images[i])
-            lbllist_binary.append(1)
-    return np.array(imglist),np.array(lbllist),np.array(lbllist_binary)
-"""
+
 def selectNum(labels,nums):
     lbllist_binary=[]
     for i in range(0,len(labels)):
@@ -204,37 +235,18 @@ def selectNum(labels,nums):
     return np.array(lbllist_binary)
 
 
-def drawimg(images,labels,dir_path,kind,pixel,tnam='',basic=False,ncol=40,nrow=5,skip=True):
-    #print "  Drawing"
+def drawimg(images,labels,dir_path,kind,pixel,tnam='',ncol=20,nrow=5,skip=True):
     tt = time.time()
     if(len(pylab.get_fignums())>0):pylab.close()
     count = 0
 
-    """
-    fig, axs = plt.subplots(nrows=nrow, ncols=ncol, sharex=True, figsize=(50,50))
-    #ax.locator_params(nbins=4)
-
     for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
         if skip:
             if(index%4!=0):continue
         if len(image.shape)==1:
             image = image.reshape(pixel,pixel)
-        #if kind.find('basic') == -1:image = image.T
-        if basic == True:image = image.T
-        ax = axs[count//ncol,count%ncol]
-        ax.axis('off')
-        ax.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
-        ax.set_title('%s' % str(label))
-        count =count+1
+        if not 'basic' in kind:image = image.T
 
-    """
-    for index, (image, label) in enumerate(zip(images, labels)[:(nrow*ncol*10-10)]):
-        if skip:
-            if(index%4!=0):continue
-        if len(image.shape)==1:
-            image = image.reshape(pixel,pixel)
-        #if kind.find('basic') == -1:image = image.T
-        if basic == True:image = image.T
         pylab.subplot(nrow, ncol, count + 1)
         pylab.axis('off')
         pylab.imshow(image, cmap=pylab.cm.gray_r, interpolation='nearest')
@@ -252,7 +264,8 @@ def drawimgContour(images,labels,contours,dir_path,kind,pixel):
 
     for index, (image, label,cont) in enumerate(zip(images, labels,contours)[:nrow*ncol]):
         image = image.reshape(pixel,pixel)/100.0
-        if kind.find('mnist_basic') == -1:image = image.T
+        if kind.find('basic') == -1:image = image.T
+        #if not 'basic' in kind:image = image.T
         pylab.subplot(nrow, ncol, index + 1)
         pylab.axis('off')
         cv2.drawContours(image, cont[0], -1, (128,255,128), -1 )

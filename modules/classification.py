@@ -11,7 +11,7 @@
 # Licence:     <your licence>
 #-------------------------------------------------------------------------------
 
-import os,cv2,time,csv,copy,pylab
+import os,cv2,time,csv,copy,pylab,pickle
 import numpy as np
 import optunity,optunity.metrics
 import matplotlib.pyplot as plt
@@ -30,6 +30,7 @@ from modules.gabor_cv import *
 from modules.gabor_opt1 import *
 from modules.optClfs import *
 from modules.optSVM import *
+from modules.hog import *
 
 
 class Classification():
@@ -47,14 +48,15 @@ class Classification():
             if not os.path.exists(self.dir_output_dgt):os.mkdir(self.dir_output_dgt)
             # initialization
             self.ROCs = {}
-            self.basicResults=[self.dataName,self.numEx,featureExtr,tt,self.CLSW]
+            self.basicResults=[self.dataName,self.numEx,featureExtr,tt,self.CLSW,self.xtrain.shape[1]]
             # set Target digit
+            self.numFeature= self.xtrain.shape[1]
             self.setTarget(i)
             self.setParams()
 
             # Classification
             if modelchoice=='optClfs':
-                self.bname=self.dataName+'_'+featureExtr+'_'+str(i)+'_clfs'+'_'
+                self.bname=self.dataName+'_'+featureExtr+'_clfs'+('_weight_d' if self.CLSW else '_d')+str(i)+'_'
                 model,results = optClf(self,copy.copy(self.basicResults))
                 for data in ['test','train']:
                     results_,_=self.evaluateModel(model,copy.copy(results),modelchoice,data=data)
@@ -63,8 +65,8 @@ class Classification():
                     self.csvWriter.writerow(results_)
 
             elif modelchoice=='optSVM':
-                self.bname=self.dataName+'_'+featureExtr+'_'+str(i)+'_'
                 for param in opts:
+                    self.bname=self.dataName+'_'+featureExtr+'_'+param+('_weight_d' if self.CLSW else '_d')+str(i)+'_'
                     model,results = optSVM(self,param,copy.copy(self.basicResults))
                     for data in ['test','train']:
                         results_,_=self.evaluateModel(model,copy.copy(results),param,data=data)
@@ -89,7 +91,6 @@ class Classification():
             self.num_folds=2
             self.num_iter=5
 
-        self.numFeature= self.xtrain.shape[1]
         if np.min(np.bincount(self.labels_trbi))<self.num_folds:
             self.num_folds=np.min(np.bincount(self.labels_trbi))
 
@@ -97,7 +98,7 @@ class Classification():
             self.class_weight_gsearch=[{0: w} for w in range(1,11)]
             self.search = {'algorithm': {'SVM': {'kernel': {'linear': {'C': [-5, 2],'class_weight':[1,10]},
                                                'rbf': {'gamma': [-5, 2], 'C': [-5, 2],'class_weight':[1,10]},
-                                               'poly': {'degree': [2, 5], 'C': [-5,2], 'coef0': [0, 1],'class_weight':[1,10]}
+                                               'poly': {'degree': [2, 5], 'C': [-5,2], 'coef0': [0, 1],'class_weight':[1,100]}
                                                }
                                     },
                             #'k-nn': {'n_neighbors': [1, 5]},
@@ -170,7 +171,7 @@ class Classification():
 
         model = model.fit(self.xtrain, self.ytrain)
         ypredict = model.predict(xpredict)
-        if 'SVM' in results[11]:
+        if 'SVM' in results[12]:
             ypredict_score = model.decision_function(xpredict)
         else:
             ypredict_score = model.predict_proba(xpredict)[:, 1]
@@ -217,5 +218,34 @@ class Classification():
         return combs
 
 
+    def exportResults_csv(self,lis,nam):
+        f = open(os.path.join(self.dir_output_dgt,nam+'.csv'), 'ab+')
+        csvWriter = csv.writer(f)
+        for i in range(0,lis.shape[0]):
+            csvWriter.writerow(lis[i])
+        del csvWriter
+        f.close()
 
+    def exportResults_pkl(self,dat,nam,odir=None):
+        if dat is not None:
+            if not odir:odir=self.dir_output_dgt
+            with open(os.path.join(odir,nam),'wb') as f:
+                pickle.dump(dat,f)
+
+    def importResults_pkl(self,nam,dirs):
+        with open(os.path.join(dirs,nam),'rb') as f:
+            return pickle.load(f)
+
+    def makeFileName(self,bname,params,odir=None):
+        names=[]
+        for data,size in zip(['_train_','_test_','_val_'],[self.trainSize,self.teSize,self.valSize]):
+            if type(params)==list:
+                name=bname+'_'.join(map(str,params))+data+str(size)
+            else:
+                name=bname+str(params)+data+str(size)
+            if odir:
+                names.append(os.path.join(odir,name))
+            else:
+                names.append(name)
+        return names
 

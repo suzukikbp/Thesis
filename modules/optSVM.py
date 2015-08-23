@@ -66,19 +66,10 @@ def optSVM(self,param,results,num_folds=2, num_iter=10,num_evals=100):
         optimal_pars, info, optimal_pars3 = optunity.maximize_structured(svm_acc,\
                                 search_space=args,num_evals=num_evals)
 
+        #optimal_pars, info, optimal_pars3 = optunity.maximize_structured(svm_acc,\
+        #                        search_space=args,num_evals=num_evals,pmap=optunity.pmap)
 
         """
-        def svm_acc(x_train, y_train, x_test, y_test, C, gamma,w):
-            model = svm.SVC(kernel='rbf',C=10**C, gamma=10**gamma,class_weight={0:w},probability=True).fit(x_train, y_train)
-            predictions = model.decision_function(x_test)
-            return optunity.metrics.roc_auc(y_test, predictions, positive=True)
-
-        args = {'num_evals':num_evals, \
-                'C':self.search['algorithm']['SVM']['kernel']['rbf']['C'],\
-                'gamma':self.search['algorithm']['SVM']['kernel']['rbf']['gamma'],\
-                'w':self.search['algorithm']['SVM']['kernel']['rbf']['class_weight']}
-
-        optimal_pars, info, optimal_pars3 = optunity.maximize(svm_acc,**args)
         #optimal_pars, info, optimal_pars3 = optunity.maximize(svm_acc,pmap=optunity.pmap,**args)
         #optimal_pars, info, optimal_pars3 = optunity.maximize(svm_acc, C=[-5, 2], gamma=[-5, 2],w=[1,10], pmap=optunity.pmap)
         """
@@ -97,12 +88,23 @@ def optSVM(self,param,results,num_folds=2, num_iter=10,num_evals=100):
         Cs=info.call_log['args']['C']
         Gs=info.call_log['args']['G']
         Vs=info.call_log['values']
-        xys=[np.array([10**np.array(Cs),10**np.array(Gs)])]
-        plotScatter(xys,'C','gamma',param+'_svmrbf_params',dir_o=self.dir_output_dgt,tnam=param)
 
+        # drawing how params evolved
+        xys=[np.array([10**np.array(Cs),10**np.array(Gs)])]
+        plotScatter(xys,'C','gamma',self.bname+'params',dir_o=self.dir_output_dgt,tnam=param)
+
+        # drawing how optima evolved
         x=np.linspace(1,len(Vs),len(Vs))
         xys=[np.array([x,Vs])]
-        plotScatter(xys,'Index','optimum',param+'_svmrbf_optimum',dir_o=self.dir_output_dgt,tnam=param,cl=False)
+        plotScatter(xys,'Index','optimum',self.bname+'_optimum',dir_o=self.dir_output_dgt,tnam=param,cl=False)
+
+        # export all results
+        self.exportResults_csv(np.array([Cs,Gs,Vs]).transpose(),self.bname)
+        #self.exportResults_pkl(info,self.bname+'svmrbf'+ ('_weight' if self.CLSW else ''))
+        self.exportResults_pkl(info.call_log,self.bname+'svmrbf'+ ('_weight' if self.CLSW else ''))
+
+
+
 
 
     print '   %s: %0.2f sec'%(param,tt)

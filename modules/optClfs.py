@@ -78,13 +78,13 @@ def optClf(self,results,num_folds=2, num_iter=10,num_evals=100):
     Vs=info.call_log['values']
     x=np.linspace(1,len(Vs),len(Vs))
     xys=[np.array([x,Vs])]
-    plotScatter(xys,'Index','optimum','Optclsf_optimum',dir_o=self.dir_output_dgt,cl=False)
+    plotScatter(xys,'Index','optimum',self.bname+'optimum',dir_o=self.dir_output_dgt,cl=False)
 
     As=np.array(info.call_log['args']['algorithm'],dtype='object')
     Ks=np.array(info.call_log['args']['kernel'],dtype='object')
     Ks[np.where(Ks.astype(str)=='None')]=''
     #algos=np.add(As,Ks).astype(str)
-    algos=np.add(As,'' if Ks==None else Ks).astype(str)
+    algos=np.add(As,'' if Ks is None else Ks).astype(str)
 
     #Gs=sorted(np.unique(algos))
     #for i,v in enumerate(Gs):
@@ -95,7 +95,11 @@ def optClf(self,results,num_folds=2, num_iter=10,num_evals=100):
 
     x=np.linspace(1,len(Ks),len(Ks))
     xys=[np.array([x,algos.astype(np.int64)])]
-    plotScatter(xys,'Index','optimum','Optclsf_algos',dir_o=self.dir_output_dgt,cl=False)
+    plotScatter(xys,'Index','optimum',self.bname+'algos',dir_o=self.dir_output_dgt,cl=False)
+
+    # export results
+    #self.exportResults_csv(np.array([Cs,Gs,Vs]).transpose(),self.bname)
+    self.exportResults_pkl(info.call_log,self.bname+'svmrbf'+ ('_weight' if self.CLSW else ''))
 
 
     pso_params=[num_folds,num_iter,num_gen,num_par,num_evals]

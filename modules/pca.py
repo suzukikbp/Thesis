@@ -62,7 +62,7 @@ class PCA():
         plt.plot(culm[0:cp_show])
         plt.xlabel("Index")
         plt.ylabel("Cumulated Eigenvalues (%)")
-        plt.savefig(os.path.join(dir_output,name+'eigenvalues_'+str(cp_show)+'.png'))
+        plt.savefig(os.path.join(dir_output,name+'_eigenvalues_'+str(cp_show)+'.png'))
         return cp
 
     # select only num_components
@@ -95,3 +95,16 @@ class PCA():
 
         return [eigenvalues, eigenvectors, mu]
 
+    def exportImg(self,img_org,img_pca,pixel):
+        img_org=img_org.reshape(pixel,pixel).transpose()
+        img_pca=img_pca.reshape(pixel,pixel).transpose()
+
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+        ax1.axis('off')
+        ax1.imshow(img_org, cmap=plt.cm.gray)
+        ax1.set_title('Input image')
+
+        ax2.axis('off')
+        ax2.imshow(img_pca, cmap=plt.cm.gray)
+        ax2.set_title('After PCA')
+        plt.savefig(os.path.join(self.dir_output,self.bname+'_PCA_cha'))

@@ -11,21 +11,22 @@ from scipy import misc as scm
 from modules.ccode import *
 from modules.pca import *
 from modules.preposs import *
+from modules.classification import *
 
 
-class Gabor():
-    def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,bname,**kargs):
+class Gabor(object):
+    def __init__(self,pixel,img_tr,img_te,img_vl,dir_in,dir_out,dir_data,bname,**kargs):
         self.SHOW = 0
         self.EXP = True
         self.DEBUG = kargs['DEBUG']
         self.ALPHA = False
         # 1. Set initial Parameters
-        self.dir_input,self.dir_output,self.bname = dir_in,dir_out,bname
+        self.dir_input,self.dir_output,self.dir_data,self.bname = dir_in,dir_out,dir_data,bname
         self.img_tr,self.img_te,self.img_vl=img_tr,img_te,img_vl
         self.pixel=pixel
         self.results=[str(dir_out.split('\\')[-1])]
         self.alpha=-1
-        csvname=os.path.join(os.path.dirname(dir_out),'gabourResults.csv')
+        csvname=os.path.join(os.path.dirname(dir_out),'gabourResults_'+bname+'.csv')
         self.f = open(csvname, 'ab+')
         self.csvWriter = csv.writer(self.f)
 
@@ -69,7 +70,7 @@ class Gabor():
         idx = np.where(params[0]==self.eccs)[0][0]
         self.sigma=params[1][idx]
         ps=params2[idx]
-        self.results.extend(time.time()-tt)
+        self.results.extend([time.time()-tt])
         self.width = ps[1][0]
         self.N = ps[1][4]
         self.nbPhi=ps[1][1]
@@ -80,7 +81,7 @@ class Gabor():
 
         # Additional regulation
         if self.ALPHA:self.setAlpha()
-        else:self.results.extend(['','','','','',''])
+        else:self.results.extend(['','','','','','','','','','','',''])
 
 
     # N:the number of block in the images
@@ -258,7 +259,7 @@ class Gabor():
         if(self.DEBUG==1):sigmas = np.linspace(min(sig1,sig2),max(sig1,sig2),3)
         return sigmas
 
-    def buildKernel(self,ks, sigma, phi ,lamda):
+    def buildKernel(self,ks, sigma, phi ,lamda,gamma=1):
         # interval
         #xs=ys=np.linspace(-ks/2.,ks/2.,ks)
         xs=ys=np.linspace(-1.,1.,ks)
@@ -353,24 +354,29 @@ class Gabor():
         ecc = 0.
         nbimg=0
         imgList=[]
+        kernelList=[]
         for img in imgs:
             nbimg += 1
             ecc_img= 0.
             c=0
             temp = []
+            kernels=[]
+            for i in range(0,len(phis)): # iterate over phis
+                kernels.append(self.buildKernel(ksize, sigma, phis[i] ,lamda))
+            kernelList.append(kernels)
             for i in range(0,len(phis)): # iterate over phis
                 for j in range(0,len(phis)):
                     if i>j:
                         c +=1
                         #print '     sig: %0.2f, phi:%0.2f'%(sig,phi)
-                        keri =self.buildKernel(ksize, sigma, phis[i] ,lamda)
-                        kerj =self.buildKernel(ksize, sigma, phis[j] ,lamda)
+                        keri =kernels[i]
+                        kerj =kernels[j]
                         if self.SHOW == 1:self.showGFilter(keri)
                         # compare output of Gabor filter with different phis
-                        gbr_i = self.convol(img.reshape(self.pixel,self.pixel),np.real(keri),ksize=ksize,N=N)
-                        gbr_j = self.convol(img.reshape(self.pixel,self.pixel),np.real(kerj),ksize=ksize,N=N)
-                        #gbr_i = cv2.filter2D(img.reshape(self.pixel,self.pixel), cv2.CV_32F,np.real(keri))
-                        #gbr_j = cv2.filter2D(img.reshape(self.pixel,self.pixel), cv2.CV_32F,np.real(kerj))
+                        #gbr_i = self.convol(img.reshape(self.pixel,self.pixel),np.real(keri),ksize=ksize,N=N)
+                        #gbr_j = self.convol(img.reshape(self.pixel,self.pixel),np.real(kerj),ksize=ksize,N=N)
+                        gbr_i = cv2.filter2D(img.reshape(self.pixel,self.pixel), cv2.CV_32F,np.real(keri))
+                        gbr_j = cv2.filter2D(img.reshape(self.pixel,self.pixel), cv2.CV_32F,np.real(kerj))
 
                         if self.EXP:
                             if nbimg==1:
@@ -387,6 +393,14 @@ class Gabor():
                             print 'error'
                         imgList.append(gbr_i)
             ecc += ecc_img/c
+
+        # export appplied kernels
+        from modules.classification import *
+        cls=Classification()
+        params = '_%s_%s_%s_%s'%(str(ksize),str(sigma),str(lamda),str(len(phis)))
+        name = self.bname+params+'_train_'+str(len(imgs))
+        cls.exportResults_pkl(kernelList,name,odir=os.path.join(self.dir_data,'gkers'))
+
         return ecc,imgList
 
     # Calculate Entropy Correlation Coefﬁcient (ECC)
